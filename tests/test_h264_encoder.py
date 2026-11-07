@@ -42,7 +42,7 @@ class TestH264Encoder(unittest.TestCase):
     def test_hdmi_dienst_nutzt_bps(self):
         with open(os.path.join(ROOT, "irl4you", "hdmi_daemon.py"), encoding="utf-8") as f:
             t = f.read()
-        self.assertEqual(len(re.findall(r'"mpph264enc", "bps=%d"', t)), 3)
+        self.assertEqual(len(re.findall(r'"mpph264enc", "bps=%d"', t)), 4)
         self.assertNotIn('"mpph264enc", "bitrate=', t)
 
 
