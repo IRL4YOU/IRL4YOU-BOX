@@ -22,12 +22,19 @@
     }
     let testTimer = 0;
     function pollTest() { clearTimeout(testTimer); testTimer = setTimeout(async () => { try { App.set('uplinktest', await api('GET', '/api/uplinktest')); } catch (e) { return; } if (ut().busy) pollTest(); }, 1500); }
+    const fig = (label, v, unit) => h('div', { class: 'stat' }, h('span', { class: 'stat__label', text: label }), h('span', { class: 'stat__value', style: 'font-size:var(--text-lg)' }, v, h('span', { class: 'stat__unit', text: unit })));
     function testText(t) {
       if (!t) return null;
-      if (t.state === 'wartet') return h('span', { class: 'muted', text: 'Wartet …' });
-      if (t.state === 'läuft') return h('span', { class: 'muted', text: 'Test läuft: ' + (t.step || 'Start') });
+      if (t.state === 'wartet') return badge('Wartet …');
+      if (t.state === 'läuft') return badge('Test läuft: ' + (t.step || 'Start'), null, true);
       if (t.state === 'fehler') return alertBox({ tone: 'danger', text: (t.text || 'Test fehlgeschlagen') + (t.hint ? ' ' + t.hint : '') });
-      if (t.state === 'fertig') { const p = []; if (t.down_mbit != null) p.push(`↓ ${fmt(t.down_mbit)} Mbit/s`); if (t.up_mbit != null) p.push(`↑ ${fmt(t.up_mbit)} Mbit/s`); if (t.rtt_ms != null) p.push(`Antwortzeit ${t.rtt_ms} ms`); return h('span', { class: 'num', text: p.join(' · ') + (t.during_send ? ' (während der Sendung gemessen)' : '') }); }
+      if (t.state === 'fertig') {
+        const f = [];
+        if (t.down_mbit != null) f.push(fig('Herunterladen', fmt(t.down_mbit), 'Mbit/s'));
+        if (t.up_mbit != null) f.push(fig('Hochladen', fmt(t.up_mbit), 'Mbit/s'));
+        if (t.rtt_ms != null) f.push(fig('Antwortzeit', String(t.rtt_ms), 'ms'));
+        return h('div', { class: 'stack', style: '--gap:var(--space-1)' }, h('div', { class: 'cluster', style: '--gap:var(--space-6)' }, ...f), t.during_send ? h('span', { class: 'muted', style: 'font-size:var(--text-xs)', text: 'Während der Sendung gemessen' }) : null);
+      }
       return null;
     }
     function paintTests() { const t = ut().tests || {}; for (const [k, el] of Object.entries(resEls)) el.replaceChildren(...[testText(t[k])].filter(Boolean)); allBtn.disabled = !!ut().busy; document.querySelectorAll('[data-testbtn]').forEach(b => { b.disabled = !!ut().busy; }); }
@@ -48,7 +55,7 @@
         const rate = h('span', { class: 'num', text: '– Mbit/s hoch' }); rateEls[o.iface] = rate;
         const res = h('div', { class: 'utdiag' }); resEls[o.iface] = res;
         const state = d ? badge(d.level === 'bad' ? 'Ausgefallen' : 'Prüfen', d.level === 'bad' ? 'danger' : 'warn') : (o.ip ? badge('Bereit', 'ok') : badge('Getrennt'));
-        const end = [state, hot.has(o.iface) ? badge('Hotspot der Box') : !CAN_TEST ? null : h('button', { class: 'btn', type: 'button', 'data-size': 'sm', 'data-testbtn': '', onclick: () => startTest({ iface: o.iface }) }, 'Testen'),
+        const end = [state, hot.has(o.iface) ? badge('Hotspot der Box') : !CAN_TEST ? null : (() => { const b = btn('Testen', { size: 'sm', ico: 'activity', onclick: () => startTest({ iface: o.iface }) }); b.setAttribute('data-testbtn', ''); return b; })(),
           sw({ checked: sel.has(o.iface), aria: `${name} zum Senden verwenden`, onchange: (on, el) => setUplinks(o.iface, on, el) })].filter(Boolean);
         const r = row({ icon: o.iface.startsWith('wlan') ? 'wifi' : 'ethernet', title: Neu.named(name, Neu.iconBtn('pencil', 'Leitung umbenennen', () => Neu.rename('net:' + o.iface, (sr.conn_names || {})[o.iface] || ''))), desc: h('span', null, o.ip || 'Keine Adresse', ' · ', rate), end });
         const extra = [d ? alertBox({ tone: d.level === 'bad' ? 'danger' : 'warn', text: d.text + (d.hint ? ' ' + d.hint : '') }) : null, res].filter(Boolean);
