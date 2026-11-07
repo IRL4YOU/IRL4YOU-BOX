@@ -117,6 +117,20 @@ class Bluetooth(unittest.TestCase):
         self.assertFalse(self.m.unblock_hci("hci1", bt_root=self.root))
         self.assertFalse(self.m.unblock_hci("hci9", bt_root=self.root))
 
+    def test_meldung_ohne_noetigen_treiber_passt_zur_anzeige(self):
+        # Ein Adapter ist "bereit": die Meldung darf nicht behaupten, es stecke kein Stick
+        bt = f"{self.root}/bt"
+        self.assertEqual(self.m.adapters(bt), [])
+        os.makedirs(f"{bt}/hci0")
+        os.makedirs(f"{bt}/hci1")
+        os.makedirs(f"{bt}/rfkill0")
+        self.assertEqual(self.m.adapters(bt), ["hci0", "hci1"])
+        mit = self.m.keine_hilfe_noetig(self.m.adapters(bt))
+        ohne = self.m.keine_hilfe_noetig([])
+        self.assertIn("nichts einzurichten", mit)
+        self.assertNotIn("kein Bluetooth-Stick", mit)
+        self.assertIn("kein Bluetooth-Adapter", ohne)
+
     def test_anfrage_nur_mit_inhalt_install(self):
         p = os.path.join(self.root, "req")
         put(p, "install\n")
