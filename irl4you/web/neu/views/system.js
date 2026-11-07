@@ -15,7 +15,7 @@
        Updates: Software (IRL4YOU BOX)
        ================================================================= */
     const swBox = h('div'), histCard = h('div');
-    let swPending = 0, swSaw = false, swFirst = null, swSig = '', swVersions = [], swCur = '', verInput = input({ placeholder: 'Version wählen oder eintragen, z. B. 0.9.0', maxlength: 24, list: 'sw-vers', autocomplete: 'off' }), verInfo = h('p', { class: 'field__hint' }), dl = h('datalist', { id: 'sw-vers' }), swMsg = note(), swHist = null, histSecs = null, histQ = input({ type: 'search', placeholder: 'Suchen, z. B. Vorschau, Chat, Fußleiste', maxlength: 60 });
+    let swChecking = 0, swPending = 0, swSaw = false, swFirst = null, swSig = '', swVersions = [], swCur = '', verInput = input({ placeholder: 'Version wählen oder eintragen, z. B. 0.9.0', maxlength: 24, list: 'sw-vers', autocomplete: 'off' }), verInfo = h('p', { class: 'field__hint' }), dl = h('datalist', { id: 'sw-vers' }), swMsg = note(), swHist = null, histSecs = null, histQ = input({ type: 'search', placeholder: 'Suchen, z. B. Vorschau, Chat, Fußleiste', maxlength: 60 });
     const swPoll = poll('swupdate', '/api/swupdate', 8000, () => App.view === 'system' || swPending);
     const SW_TERMINAL = ['failed', 'refused', 'rolledback']; let swNewer = false, sysAvail = false; const navDot = () => { const nd = document.getElementById('nd-system'); nd.hidden = !(swNewer || sysAvail); nd.dataset.tone = ''; };
     const swBegin = text => { swPending = Date.now(); swSaw = false; window.pbUpdating = swPending; swMsg.set(text); swSig = ''; renderSw(); };
@@ -29,12 +29,23 @@
     }
     setInterval(() => { if (swPending) { if (!App.data['swupdate:ok']) swPublic(); else swPoll(); } }, 2000);
     const swAct = async (body, begin) => { swBegin(begin); try { await api('POST', '/api/swupdate', body); } catch (x) { swPending = 0; window.pbUpdating = 0; swMsg.set(x.message, 'bad'); } setTimeout(swPoll, 1500); };
+    /* Die Prüfung läuft im Hintergrund (Helfer); hier warten, bis ein neues Ergebnis da ist, und es sagen */
+    async function swCheck() {
+      const t0 = (App.data.swupdate || {}).checked_at || 0; swChecking = Date.now(); swSig = ''; let d = App.data.swupdate || {};
+      try {
+        d = await api('GET', '/api/swupdate?check=1'); App.set('swupdate', d);
+        const end = Date.now() + 30000;
+        while (Date.now() < end && (d.checked_at || 0) === t0 && d.state !== 'installing') { await sleep(1500); d = await api('GET', '/api/swupdate'); App.set('swupdate', d); }
+      } catch (e) { toast(e.message); } finally { swChecking = 0; swSig = ''; }
+      App.set('swupdate', d);
+      toast((d.checked_at || 0) === t0 ? 'Die Prüfung hat nicht geantwortet. Bitte gleich noch einmal versuchen.' : d.newer ? 'Neue Version ' + (d.latest_version || d.latest) + ' ist verfügbar.' : d.message && !/aktuell/i.test(d.message) ? d.message : 'Du hast die neueste Version.');
+    }
     function renderSw() {
       const d = App.data.swupdate; if (!d) return;
       if (swFirst === null) swFirst = d.current; const installing = d.state === 'installing'; if (installing) { swSaw = true; if (!swPending) { swPending = Date.now(); window.pbUpdating = swPending; } }
       if (swFirst !== d.current && !installing) { swFinish(d.current); return; }
       if (swPending) { const age = Date.now() - swPending; if ((d.state === 'done' || (d.state === 'rolledback' && swFirst !== d.current)) && (swSaw || age > 25000)) { swFinish(d.current); return; } if (age > 10000 && SW_TERMINAL.includes(d.state)) { swPending = 0; window.pbUpdating = 0; } else if (age > 900000) { swPending = 0; window.pbUpdating = 0; } }
-      const sg = JSON.stringify([d, swPending, histSecs && 1]); if (sg === swSig) return; if (swBox.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; swSig = sg;
+      const sg = JSON.stringify([d, swPending, histSecs && 1, swChecking && 1]); if (sg === swSig) return; if (swBox.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; swSig = sg;
       const busy = installing || !!swPending; swVersions = d.versions || []; swCur = d.current; window.swCurVer = d.current;
       document.getElementById('ver').textContent = 'Version ' + d.current + (d.stage ? ' (' + d.stage + ')' : '');
       swNewer = !!d.newer; navDot();
@@ -42,6 +53,7 @@
       let m = ''; if (!d.helper_installed) m = 'Der Update-Helfer ist nicht installiert. Bitte install.sh einmal erneut ausführen.'; else if (d.error) m = d.error; else if (busy) m = (d.state === 'installing' ? 'Das Update läuft' : 'Update wird gestartet') + ' … Die Seite lädt danach von selbst neu.';
       else if (d.state === 'done' || d.state === 'rolledback' || d.state === 'refused' || d.state === 'failed') m = d.message; else if (d.sending && d.newer) m = 'Update gesperrt: Es wird gerade gesendet.'; else if (d.newer && d.bridge) m = 'Die Testphase ist beendet: Dieses Update führt zurück auf die stabile Version. Installieren geht nur, wenn nicht gesendet wird.'; else if (d.newer) m = 'Eine neue Version ist da. Installieren geht nur, wenn nicht gesendet wird.';
       else if (d.latest) m = 'Du hast die neueste Version.' + (d.checked_at ? ` Zuletzt geprüft um ${ftime(d.checked_at)}.` : '');
+      if (swChecking && !busy) m = 'Suche nach Updates …';
       swMsg.set(m, (d.state === 'failed' || d.state === 'refused' || d.error) && !swPending ? 'bad' : '');
       const x = () => swVersions.find(v => v.version === verInput.value.trim().replace(/^v/, ''));
       const showInfo = () => { const raw = verInput.value.trim(), v = x(); verInfo.textContent = !raw ? (swVersions.length > 1 ? 'Verfügbar: ' + swVersions.filter(q => !q.current).slice(0, 6).map(q => q.version + (q.relation === 'älter' ? ' (älter)' : ' (neuer)')).join(', ') + '.' : 'Es sind noch keine anderen Versionen gesichert oder veröffentlicht.') : (!v || v.current) ? (v && v.current ? 'Diese Version ist schon installiert.' : 'Diese Version kennt die Box nicht (weder gesichert noch auf GitHub veröffentlicht).') : `Version ${v.version}: ${v.relation}${v.local ? ', lokal gesichert (sofort verfügbar)' : ''}${v.github ? ', auf GitHub veröffentlicht' : ''}${v.date ? ', ' + v.date : ''}.`; }; verInput.oninput = showInfo; showInfo();
@@ -49,7 +61,7 @@
         actions: [busy ? badge('läuft …', 'accent') : d.error ? badge('unbekannt') : d.newer ? badge('Update verfügbar', 'accent') : d.channel === 'test' ? badge('Testversion', 'warn') : badge('aktuell', 'ok')], body: [
         kv('Installiert', 'v' + d.current + (d.stage ? ' (' + d.stage + ')' : '')), kv('Neueste auf GitHub', d.latest ? 'v' + (d.latest_version || d.latest) : (d.error ? '–' : 'wird geprüft …')),
         d.newer && d.notes ? md(d.notes) : null, busy ? prog(d.progress || 0, d.step || 'Update wird gestartet') : null, swMsg,
-        h('div', { class: 'cluster' }, btn('Nach Updates suchen', { size: 'sm', ico: 'refresh', disabled: busy, run: async () => { swMsg.set('Suche …'); App.set('swupdate', await api('GET', '/api/swupdate?check=1')); } }),
+        h('div', { class: 'cluster' }, btn('Nach Updates suchen', { size: 'sm', ico: 'refresh', disabled: busy, run: swCheck }),
           btn('Update installieren', { size: 'sm', variant: d.newer ? 'primary' : null, disabled: busy || !d.newer || d.sending || !d.helper_installed, onclick: async () => { if (await ask({ title: 'Software-Update installieren?', text: '• Es darf KEINE Übertragung laufen.\n• Die Oberfläche startet dabei kurz neu (etwa eine halbe Minute).\n• Kameras und Einstellungen bleiben erhalten; der Kamera-Dienst startet nur neu, wenn sich seine Dateien ändern.\n• Die jetzige Version wird gesichert, du kannst zurückgehen.', ok: 'Installieren' })) swAct({ action: 'install', confirm: true }, 'Update wird gestartet …'); } }),
           d.backup_version && !busy ? btn(`Zurück zu Version ${d.backup_version}`, { size: 'sm', onclick: async () => { if (await ask({ title: 'Zur vorherigen Version zurückgehen?', text: 'Die Oberfläche startet dabei kurz neu. Es darf nicht gesendet werden.', ok: 'Zurückgehen' })) swAct({ action: 'rollback', confirm: true }, 'Wird zurückgestellt …'); } }) : null),
         h('div', { class: 'stack', style: '--gap:var(--space-2)' }, h('label', { class: 'field__label', text: 'Auf eine bestimmte Version wechseln (auch ältere)' }), h('div', { class: 'cluster', style: 'flex-wrap:nowrap' }, h('div', { class: 'grow' }, verInput), dl,
