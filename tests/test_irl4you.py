@@ -14,6 +14,7 @@ import sys
 import tempfile
 import types
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IRL = os.path.join(ROOT, "irl4you")
@@ -147,8 +148,11 @@ class TestModem(unittest.TestCase):
             self.assertEqual(len(st["modems"]), 1)
             mid = st["modems"][0]["id"]
             self.assertTrue(st["modems"][0]["config"]["autoconfig"])
-            with self.assertRaises(ValueError):          # Helfer nicht installiert (keine Unit auf diesem Rechner)
-                m.request({"action": "config", "id": mid, "roaming": True})
+            echtes_exists = os.path.exists
+            kein_helfer = lambda p: False if p == "/etc/systemd/system/pipbox-modem.path" else echtes_exists(p)  # noqa: E731
+            with mock.patch("os.path.exists", kein_helfer):
+                with self.assertRaises(ValueError):      # Helfer nicht installiert (die Unit dieses Rechners wird ausgeblendet)
+                    m.request({"action": "config", "id": mid, "roaming": True})
             m.status = lambda: dict(st, helper_installed=True)
             m.request({"action": "config", "id": mid, "autoconfig": False, "apn": "internet", "password": "pw1", "network_type": "3g|4g"})
             req = json.load(open(os.path.join(d, pm.REQ_NAME)))
@@ -704,6 +708,9 @@ class TestSendekette(unittest.TestCase):
         """Update über irl4you-update: Version = Commit (12 Zeichen), Stichworte check/install/rollback/switch <Commit>."""
         import time
         sw = self.server.SwUpdate
+        mod = sys.modules[sw.__module__]
+        alt_encoder = mod.encoder_running
+        mod.encoder_running = lambda: False         # ein laufender Encoder dieser Maschine darf den Test nicht beeinflussen
         d = tempfile.mkdtemp()
         A, B, C = "a" * 12, "b" * 12, "c" * 12      # aktiv, vorherige, neuester
         try:
@@ -772,6 +779,7 @@ class TestSendekette(unittest.TestCase):
             self.assertEqual(open(u.req).read(), "check\n")
             self.assertIn("Neuer Stand", u.history()["text"])
         finally:
+            mod.encoder_running = alt_encoder
             shutil.rmtree(d, ignore_errors=True)
 
     def test_kamera_zustaende_vom_encoder(self):
