@@ -957,7 +957,8 @@ class Updater:
             return 0
         except Refuse as e:
             self.log("abgelehnt: %s" % e)
-            self.status(state="refused", step="", message=str(e), progress=0)
+            # "Keine neuere Version" ist kein Fehler: die Box ist einfach aktuell (keine rote Meldung in der Oberfläche)
+            self.status(state="idle" if str(e).startswith("Keine neuere Version") else "refused", step="", message=str(e), progress=0)
             return 2
         except Exception as e:                                  # nie ohne Meldung enden
             self.log("Fehler: %r" % (e,))
