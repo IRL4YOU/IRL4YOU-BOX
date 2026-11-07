@@ -7,6 +7,7 @@
     const leitungen = h('div', { class: 'stack' }), server = h('div', { class: 'stack' });
     const CAN_TEST = true;
     const allBtn = btn('Alle Leitungen testen', { ico: 'activity', onclick: () => startTest({ all: true }) });
+    allBtn.setAttribute('data-shape', 'pill');
     sec.append(pageHead('Netzwerk', null, CAN_TEST ? [allBtn] : []));
     const T = Neu.slots.netz = Neu.tabbed(sec, 'Netzwerk');
     T.add('n1', 'Leitungen', leitungen); T.add('n2', 'Server und Bitrate', server);
@@ -55,7 +56,7 @@
         const rate = h('span', { class: 'num', text: '– Mbit/s hoch' }); rateEls[o.iface] = rate;
         const res = h('div', { class: 'utdiag' }); resEls[o.iface] = res;
         const state = d ? badge(d.level === 'bad' ? 'Ausgefallen' : 'Prüfen', d.level === 'bad' ? 'danger' : 'warn') : (o.ip ? badge('Bereit', 'ok') : badge('Getrennt'));
-        const end = [state, hot.has(o.iface) ? badge('Hotspot der Box') : !CAN_TEST ? null : (() => { const b = btn('Testen', { size: 'sm', ico: 'activity', onclick: () => startTest({ iface: o.iface }) }); b.setAttribute('data-testbtn', ''); return b; })(),
+        const end = [state, hot.has(o.iface) ? badge('Hotspot der Box') : !CAN_TEST ? null : (() => { const b = btn('Testen', { size: 'sm', ico: 'activity', onclick: () => startTest({ iface: o.iface }) }); b.setAttribute('data-testbtn', ''); b.setAttribute('data-shape', 'pill'); return b; })(),
           sw({ checked: sel.has(o.iface), aria: `${name} zum Senden verwenden`, onchange: (on, el) => setUplinks(o.iface, on, el) })].filter(Boolean);
         const r = row({ icon: o.iface.startsWith('wlan') ? 'wifi' : 'ethernet', title: Neu.named(name, Neu.iconBtn('pencil', 'Leitung umbenennen', () => Neu.rename('net:' + o.iface, (sr.conn_names || {})[o.iface] || ''))), desc: h('span', null, o.ip || 'Keine Adresse', ' · ', rate), end });
         const extra = [d ? alertBox({ tone: d.level === 'bad' ? 'danger' : 'warn', text: d.text + (d.hint ? ' ' + d.hint : '') }) : null, res].filter(Boolean);
