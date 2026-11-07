@@ -11,3 +11,4 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - Niedrigste Bitrate: Standard 400 statt 300 kbit/s. Latenz als Schieberegler (Standard 4000 ms).
 - Facecam bleibt bei der Rotation auf ihrem Platz, der Ton bleibt bei ihr. Tonquelle mit Mikrofon-Symbol.
 - Schalter in der Oberfläche sind nur noch selbst anklickbar; Stream-ID des Servers lässt sich anzeigen.
+- Testbild als Kamera-Quelle: bewegtes Wellenmuster mit Schrift, Zeit und Logo, Stereo-Testton (links 440, rechts 660 Hz).
