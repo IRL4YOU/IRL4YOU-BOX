@@ -92,6 +92,14 @@ class TestFusszeileUndLinks(unittest.TestCase):
                     self.assertNotIn("irl4you_2604", t, os.path.join(root, f))
         self.assertIn("https://github.com/IRL4YOU/IRL4YOU-BOX/issues", _read(os.path.join(WEB, "neu", "views", "system.js")))
 
+    def test_kopfzeile_baut_sich_nur_bei_aenderung_neu(self):
+        # sonst startet der pulsierende Live-Punkt und der Start/Stop-Knopf alle 2 s neu: die Seite flackert
+        boot = _read(os.path.join(WEB, "neu", "boot.js"))
+        self.assertIn("if (el.dataset.k !== k)", boot)
+        self.assertIn("if (go.dataset.k !== gk)", boot)
+        kopf = _read(os.path.join(WEB, "neu", "kopf.js"))
+        self.assertIn("if (sg === dotsSig) return;", kopf)
+
     def test_weg_zur_bisherigen_oberflaeche_fuehrt_nach_alt(self):
         # "/" ist die neue Oberfläche: der Wechsel im Menü am Handy und unter System muss nach /alt gehen, sonst bleibt man in der neuen
         boot = _read(os.path.join(WEB, "neu", "boot.js"))
