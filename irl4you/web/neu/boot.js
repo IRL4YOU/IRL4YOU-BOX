@@ -131,7 +131,7 @@
   /* ---------- Zurück zur bisherigen Oberfläche: Wahl merken, damit sie beim nächsten Öffnen bleibt ---------- */
   const toOld = () => { try { localStorage.removeItem('pb_ui_wahl'); localStorage.removeItem('pb_ui'); } catch (e) { /* privat */ } };
   $('#oldui').addEventListener('click', toOld);
-  Neu.toOld = () => { toOld(); location.href = '/'; };
+  Neu.toOld = () => { toOld(); location.href = '/alt'; };
 
   /* ---------- Handy: Sprache, Hell/Dunkel und Bildschirm in einem Menü ---------- */
   $('#more-btn').addEventListener('click', () => {
