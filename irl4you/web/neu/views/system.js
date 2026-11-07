@@ -212,7 +212,7 @@
     async function devPwShow() {
       const prev = (App.data.developer || {}).time || 0; devOut.replaceChildren(); devMsg.set('Prüfe das Passwort …'); try { await api('POST', '/api/developer', { action: 'check' }); } catch (x) { devMsg.set(x.message, 'bad'); return; }
       for (let i = 0; i < 8; i++) { await sleep(800); await devRefresh(); const d = App.data.developer; if (d && d.state !== 'working' && d.time !== prev) break; }
-      devMsg.set(''); try { const r = await api('GET', '/api/developer/password'); devOut.replaceChildren(h('button', { class: 'tile mono', type: 'button', title: 'Klicken kopiert das Passwort', onclick: async () => toast(await copyText(r.password) ? 'Passwort kopiert' : 'Kopieren nicht möglich'), text: r.password }), r.state === 'own' ? h('p', { class: 'muted', text: 'Achtung: Das Passwort wurde danach von Hand geändert, dieses gilt vermutlich nicht mehr.' }) : null); devPwShown = true; } catch (x) { devMsg.set(x.message, 'bad'); devPwShown = false; } devSig = ''; renderDev();
+      devMsg.set(''); try { const r = await api('GET', '/api/developer/password'); devOut.replaceChildren(h('button', { class: 'tile mono', type: 'button', title: 'Klicken kopiert das Passwort', onclick: async () => toast(await copyText(r.password) ? 'Passwort kopiert' : 'Kopieren nicht möglich'), text: r.password }), ...(r.state === 'own' ? [h('p', { class: 'muted', text: 'Achtung: Das Passwort wurde danach von Hand geändert, dieses gilt vermutlich nicht mehr.' })] : [])); devPwShown = true; } catch (x) { devMsg.set(x.message, 'bad'); devPwShown = false; } devSig = ''; renderDev();
     }
     const devPwHide = () => { devOut.replaceChildren(); devPwShown = false; devSig = ''; renderDev(); };
     function renderDev() {
