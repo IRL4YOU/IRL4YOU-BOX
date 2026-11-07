@@ -31,7 +31,7 @@
     const swAct = async (body, begin) => { swBegin(begin); try { await api('POST', '/api/swupdate', body); } catch (x) { swPending = 0; window.pbUpdating = 0; swMsg.set(x.message, 'bad'); } setTimeout(swPoll, 1500); };
     /* Die Prüfung läuft im Hintergrund (Helfer); hier warten, bis ein neues Ergebnis da ist, und es sagen */
     async function swCheck() {
-      const t0 = (App.data.swupdate || {}).checked_at || 0; swChecking = Date.now(); swSig = ''; let d = App.data.swupdate || {};
+      const t0 = (App.data.swupdate || {}).checked_at || 0; swChecking = Date.now(); swMsg.set('Suche nach Updates …'); let d = App.data.swupdate || {};
       try {
         d = await api('GET', '/api/swupdate?check=1'); App.set('swupdate', d);
         const end = Date.now() + 30000;
@@ -45,7 +45,7 @@
       if (swFirst === null) swFirst = d.current; const installing = d.state === 'installing'; if (installing) { swSaw = true; if (!swPending) { swPending = Date.now(); window.pbUpdating = swPending; } }
       if (swFirst !== d.current && !installing) { swFinish(d.current); return; }
       if (swPending) { const age = Date.now() - swPending; if ((d.state === 'done' || (d.state === 'rolledback' && swFirst !== d.current)) && (swSaw || age > 25000)) { swFinish(d.current); return; } if (age > 10000 && SW_TERMINAL.includes(d.state)) { swPending = 0; window.pbUpdating = 0; } else if (age > 900000) { swPending = 0; window.pbUpdating = 0; } }
-      const sg = JSON.stringify([d, swPending, histSecs && 1, swChecking && 1]); if (sg === swSig) return; if (swBox.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; swSig = sg;
+      const sg = JSON.stringify([d, swPending, histSecs && 1]); if (sg === swSig) return; if (swBox.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; swSig = sg;
       const busy = installing || !!swPending; swVersions = d.versions || []; swCur = d.current; window.swCurVer = d.current;
       document.getElementById('ver').textContent = 'Version ' + d.current + (d.stage ? ' (' + d.stage + ')' : '');
       swNewer = !!d.newer; navDot();
