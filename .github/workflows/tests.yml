@@ -3,6 +3,12 @@ name: Tests
 on:
   push:
   pull_request:
+# Mehrere Dateien werden nacheinander hochgeladen, jede ist ein eigener Commit. Zwischenstände dürfen nicht prüfen und fehlschlagen
+# (jeder rote Lauf schickt eine E-Mail): Ein neuer Commit bricht den laufenden Lauf ab, jeder Lauf wartet zuerst kurz auf weitere Commits.
+# Abgebrochene Läufe zählen für die Update-Prüfung der Box nicht als grün und schicken keine E-Mail.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,6 +18,8 @@ jobs:
         python-version: ["3.13", "3.14"]
     name: test (python ${{ matrix.python-version }})
     steps:
+      - name: Auf weitere Uploads warten
+        run: sleep 150
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
