@@ -10,3 +10,5 @@ TimeoutStartSec=1h
 Nice=19
 IOSchedulingClass=idle
 CPUSchedulingPolicy=idle
+# Abgelehnte Abfrage (z. B. GitHub bremst, Exit 2) ist kein Dienstfehler: nicht als "fehlgeschlagen" anzeigen
+SuccessExitStatus=2
