@@ -1,6 +1,7 @@
 #!/bin/sh
-# Tauscht Firmware-Teile auf der SD-Karte. Aufruf als root:  irl4you-bootloader status | apply (nur ROCK 5B Plus)
+# Tauscht Firmware-Teile auf der SD-Karte. Aufruf als root:  irl4you-bootloader status | apply (ROCK 5B Plus und Orange Pi 5 Plus)
 # ROCK 5B Plus: Firmware-Stand aus dem Armbian-Image (U-Boot 2026.04, DDR v1.20, TF-A v2.13), ein Block ab Sektor 64 (Ordner rock-5b-plus/armbian/).
+# Orange Pi 5 Plus: Firmware-Stand aus dem Armbian-Image (U-Boot 2017.09, DDR v1.20, BL31 v1.48), ein Block ab Sektor 64 (Ordner orange-pi-5-plus/armbian/).
 #   status zeigt, ob er aktiv ist; apply schreibt ihn (mit Sicherung des Ist-Stands nach /var/lib/irl4you/bootloader-backup).
 # Wird NICHT automatisch beim Update ausgeführt. Neustart nach apply nötig.
 # Startet die Box danach nicht mehr, hilft nur die Karte am PC (Image neu schreiben).
@@ -12,6 +13,7 @@ MODEL_FILE=${MODEL_FILE:-/proc/device-tree/model}
 MODEL=$(tr -d '\0' < "$MODEL_FILE" 2>/dev/null || true)
 case "$MODEL" in
     *"ROCK 5B Plus"*|*"ROCK 5B+"*) BOARD=rock ;;
+    *"Orange Pi 5 Plus"*) BOARD=opi ;;
     *) BOARD=none ;;
 esac
 
@@ -37,10 +39,15 @@ put() { dd if="$1" of="$DEV" bs=512 seek="$2" conv=notrunc,fsync status=none; sy
 need_root() { [ "$(id -u)" = 0 ] || [ -n "${DEV_TEST:-}" ] || { echo "nur als root"; exit 1; }; }
 
 case "$BOARD" in
-rock)
-    V="$HERE/rock-5b-plus"
+rock|opi)
+    if [ "$BOARD" = rock ]; then
+        V="$HERE/rock-5b-plus"
+        LABEL="rock-5b-plus-armbian-uboot-2026.04-ddr-v1.20-tfa-v2.13"
+    else
+        V="$HERE/orange-pi-5-plus"
+        LABEL="orange-pi-5-plus-armbian-uboot-2017.09-ddr-v1.20-bl31-v1.48"
+    fi
     REGION="$V/armbian/region.bin"; REGION_START=64
-    LABEL="rock-5b-plus-armbian-uboot-2026.04-ddr-v1.20-tfa-v2.13"
     case "${1:-status}" in
     status)
         if is "$REGION" $REGION_START; then echo "aktiv: $LABEL"; else echo "unbekannt: nicht der mitgelieferte Firmware-Stand"; fi
@@ -50,7 +57,7 @@ rock)
         if is "$REGION" $REGION_START; then echo "schon aktiv"; exit 0; fi
         REGION_SECTORS=$(( $(stat -c %s "$REGION") / 512 ))
         mkdir -p "$BK"
-        dd if="$DEV" bs=512 skip=$REGION_START count=$REGION_SECTORS of="$BK/rock-$(date +%Y%m%d%H%M%S).bin" status=none
+        dd if="$DEV" bs=512 skip=$REGION_START count=$REGION_SECTORS of="$BK/$BOARD-$(date +%Y%m%d%H%M%S).bin" status=none
         put "$REGION" $REGION_START
         echo "geschrieben: $LABEL. Neustart nötig." ;;
     *) echo "Aufruf: $0 status|apply"; exit 1 ;;
