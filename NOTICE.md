@@ -40,9 +40,12 @@ Die Pakete in `irl4you/debs/` sind für die Box gebaut. Der Quelltext der Fremdp
 | WLAN-Treiber AIC8800 (`irl4you-wifi-aic8800`) | [shenmintao/aic8800d80](https://github.com/shenmintao/aic8800d80), Zweig `legacy-mcu1` | GPL-2.0, Firmware des Herstellers | Kernelmodul für Kernel 6.1.172 |
 | Linux-Kernel (Rockchip BSP 6.1) | [armbian/linux-rockchip](https://github.com/armbian/linux-rockchip) | GPL-2.0 | Quelle für Kernelbaum und Module |
 | Firmware-Stand ROCK 5B+ (`irl4you/install/bootloader/rock-5b-plus/armbian/region.bin`) | unverändert aus dem Armbian-Image 26.8.3: U-Boot 2026.04 ([u-boot](https://source.denx.de/u-boot/u-boot), Bau durch [armbian/build](https://github.com/armbian/build)), TF-A v2.13 ([ARM-software/arm-trusted-firmware](https://github.com/ARM-software/arm-trusted-firmware)), DDR-Initialisierung von Rockchip ([rockchip-linux/rkbin](https://github.com/rockchip-linux/rkbin)) | GPL-2.0-or-later (U-Boot), BSD-3-Clause (TF-A), Binärdatei von Rockchip | Quelle und Prüfsumme des Images in `QUELLE.md` neben der Datei |
-| Firmware-Stand Orange Pi 5 Plus (`irl4you/install/bootloader/fit-opi5plus-bl31-v1.47.bin`, `fit-opi5plus-orig-bl31-v1.45.bin`) | FIT-Abbilder aus dem Orange-Pi-Image v0.3.0 dieses Projekts (ab Sektor 16384, unverändert): U-Boot 2017.09 im Rockchip-Vendorzweig (Bau vom 15.09.2025), TF-A BL31 v1.45 bzw. v1.47 und Rockchip-Binärteile ([rockchip-linux/rkbin](https://github.com/rockchip-linux/rkbin)) | GPL-2.0-or-later (U-Boot), BSD-3-Clause (TF-A), Binärteile von Rockchip | wird nur auf der Orange Pi mit `irl4you-bootloader` geschrieben, nie automatisch |
 | bleak 3.0.2, dbus-fast 5.2.0 | PyPI | MIT / MIT | per `pip` bei der Installation geladen, nicht mitgeliefert |
 | GStreamer, libsrt, OpenSSL, nginx, NetworkManager, Python, Tailscale u. a. | Ubuntu 26.04 bzw. Tailscale-Paketquelle | jeweils eigene Lizenz (u. a. LGPL, MPL-2.0, Apache-2.0, BSD) | Systempakete, nicht verändert |
+
+## Symbole
+
+Einige Symbole der Oberfläche sind an [Feather](https://github.com/feathericons/feather) (MIT, Cole Bemis) und [Lucide](https://github.com/lucide-icons/lucide) (ISC) angelehnt, aber selbst gezeichnet. Die Lizenztexte liegen in `licenses/feather-MIT.txt` und `licenses/lucide-ISC.txt`.
 
 ## Emotes im Twitch-Chat
 
