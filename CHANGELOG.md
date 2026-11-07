@@ -2,6 +2,12 @@
 
 Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y steigt nur, wenn Marco ein Release ausruft (dann wird VERSION auf "x.y" geändert). z ist die Zahl der Commits seit dem letzten Release und wird vom Updater beim Installieren aus GitHub gezählt (VERSION enthält nur "x.y"). Die Box folgt weiterhin den Commits von main; die Nummer ist nur der Anzeigename.
 
+## 0.5
+- Testbild als Kamera-Quelle: bewegtes Wellenmuster mit Schrift, Zeit und Logo, Stereo-Testton (links 440, rechts 660 Hz).
+- Leitungstest: „Testen“ je Leitung und „Alle Leitungen testen“ (Herunterladen, Hochladen, Antwortzeit, auch während der Sendung).
+- Update-Prüfung alle 2 Stunden mit niedrigster Priorität; „Nach Updates suchen“ wartet auf das Ergebnis, auch während der Sendung.
+- Vorschau läuft flüssig, Passwortanzeige und Bluetooth-Einrichtung korrigiert.
+
 ## 0.4
 - Erste veröffentlichte Version der IRL4YOU Box: fertige Images für Orange Pi 5 Plus und Rock 5B+.
 - Neue Oberfläche als Startseite (Live, Kameras, Bild, Netzwerk, System, Suche mit Strg+K, am Handy eine Live-Leiste); die bisherige bleibt unter `/alt`. Logo als Favicon, Fußzeile mit Lizenz und Links.
@@ -11,6 +17,3 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - Niedrigste Bitrate: Standard 400 statt 300 kbit/s. Latenz als Schieberegler (Standard 4000 ms).
 - Facecam bleibt bei der Rotation auf ihrem Platz, der Ton bleibt bei ihr. Tonquelle mit Mikrofon-Symbol.
 - Schalter in der Oberfläche sind nur noch selbst anklickbar; Stream-ID des Servers lässt sich anzeigen.
-- Testbild als Kamera-Quelle: bewegtes Wellenmuster mit Schrift, Zeit und Logo, Stereo-Testton (links 440, rechts 660 Hz).
-- Leitungstest: Knopf „Testen“ je Leitung und „Alle Leitungen testen“ (Herunterladen, Hochladen, Antwortzeit, auch während der Sendung).
-- „Nach Updates suchen“ wartet auf das Ergebnis und meldet es, auch während einer Sendung.
