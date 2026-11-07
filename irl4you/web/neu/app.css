@@ -200,7 +200,7 @@
   .hsig__scale { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; height: 1.75rem; font-size: 0.5625rem; line-height: 1; color: var(--text-3); font-variant-numeric: tabular-nums; min-width: 1.5ch; }
   .hsig__scale i { font-style: normal; }
   .hsig .sg { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; fill: none; }
-  .hsig svg { width: 3.75rem; height: 1.75rem; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface-1); color: var(--text-3); }
+  .hsig svg { width: 7.5rem; height: 1.75rem; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface-1); color: var(--text-3); }
   .hsig polyline { fill: none; stroke: currentColor; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
   .hsig[data-tone="ok"] svg { color: var(--ok); } .hsig[data-tone="warn"] svg { color: var(--warn); } .hsig[data-tone="danger"] svg { color: var(--danger); }
   .hsig__v { font-weight: var(--weight-bold); color: var(--text-1); font-variant-numeric: tabular-nums; font-size: var(--text-sm); }
