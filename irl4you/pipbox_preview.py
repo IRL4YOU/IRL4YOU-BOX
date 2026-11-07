@@ -158,7 +158,7 @@ def gst_argv(codec, fps, width, cpus=None, fmt="mjpeg"):
     height = (width * 9 // 16) - ((width * 9 // 16) % 2)
     pre = ["taskset", "-c", ",".join(map(str, cpus))] if cpus and shutil.which("taskset") else []
     if fmt == "mp4":
-        out = ["!", "mpph264enc", f"bitrate={H264_BITRATE}", f"gop={fps}", "profile=main", "level=31", "!", "h264parse", "config-interval=-1",
+        out = ["!", "mpph264enc", f"bps={H264_BITRATE}", f"gop={fps}", "profile=main", "level=31", "!", "h264parse", "config-interval=-1",
                "!", "video/x-h264,stream-format=byte-stream,alignment=au", "!", "fdsink", "fd=1"]
     else:
         out = ["!", "mppjpegenc", "q-factor=60", "!", "multipartmux", f"boundary={BOUNDARY}", "!", "fdsink", "fd=1"]

@@ -126,7 +126,7 @@ def feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, device=HDMI_DEVICE,
     if not (isinstance(rtmp_app, str) and re.match(r"^[a-z0-9_]{1,20}$", rtmp_app)) or not isinstance(rtmp_port, int):
         raise ValueError("RTMP-Ziel ungültig")
     v = ["v4l2src", "device=" + device, "!", "videorate", "!", "video/x-raw,framerate=%d/1" % cfg["fps"], "!",
-         "mpph264enc", "bitrate=%d" % (cfg["bitrate"] * 1000), "gop=%d" % cfg["fps"], "!",
+         "mpph264enc", "bps=%d" % (cfg["bitrate"] * 1000), "gop=%d" % cfg["fps"], "!",
          "h264parse", "config-interval=-1", "!", "queue", "!", "mux."]
     if extra_audio is not None and not re.match(r"^plughw:CARD=[A-Za-z0-9_]{1,40}$", extra_audio):
         raise ValueError("Tongerät ungültig")
@@ -283,11 +283,11 @@ def usb_feeder_argv(cfg, device, cand, audio_device=None, rtmp_port=RTMP_PORT, r
     v = ["v4l2src", "device=" + device, "!", usb_caps(cand)[1], "!"] + _usb_decode(kind) + ["!"]
     if kind == "h264" and usb_h264_padded(cand, name):
         v += ["queue", "!", "mppvideodec", "crop-rectangle=<0,0,%d,%d>" % (cand[1], cand[2]), "height=%d" % cand[2], "!", "queue", "!",
-              "mpph264enc", "bitrate=%d" % (cfg["bitrate"] * 1000), "gop=%d" % fps, "!", "h264parse", "config-interval=-1", "!", "queue", "!", "mux."]
+              "mpph264enc", "bps=%d" % (cfg["bitrate"] * 1000), "gop=%d" % fps, "!", "h264parse", "config-interval=-1", "!", "queue", "!", "mux."]
     elif kind == "h264":
         v += ["queue", "!", "mux."]
     else:
-        v += ["queue", "!", "mpph264enc", "bitrate=%d" % (cfg["bitrate"] * 1000), "gop=%d" % fps, "!", "h264parse", "config-interval=-1", "!", "queue", "!", "mux."]
+        v += ["queue", "!", "mpph264enc", "bps=%d" % (cfg["bitrate"] * 1000), "gop=%d" % fps, "!", "h264parse", "config-interval=-1", "!", "queue", "!", "mux."]
     if cfg["audio"] in ("hdmi", "usb", "analog") and audio_device:
         a = ["alsasrc", "device=" + audio_device] + ALSA_CLOCK + ["!", "audioconvert", "!", "audioresample", "!", "audio/x-raw,rate=48000,channels=2", "!",
              "voaacenc", "bitrate=128000", "!", "aacparse", "!", "queue", "!", "mux."]
