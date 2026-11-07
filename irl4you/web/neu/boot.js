@@ -10,7 +10,8 @@
     if (s) {
       const running = s.active && s.state === 'running';
       const txt = running ? 'Live' : s.active ? 'Startet …' : s.can_start ? 'Bereit' : 'Nicht live';
-      el.replaceChildren(h('span', { class: 'dot', data: running ? { pulse: '' } : {} }), h('span', { text: txt }));
+      const k = (running ? 'p' : '-') + txt;                    // nur neu bauen, wenn sich etwas ändert (sonst startet der pulsierende Punkt alle 2 s neu)
+      if (el.dataset.k !== k) { el.dataset.k = k; el.replaceChildren(h('span', { class: 'dot', data: running ? { pulse: '' } : {} }), h('span', { text: txt })); }
       el.dataset.tone = running ? 'live' : s.can_start || s.active ? 'accent' : '';
     }
     const l = m && m.light, hl = $('#hb-light'), lv = l && ({ ok: 'ok', good: 'ok', warn: 'warn', crit: 'crit', bad: 'crit' })[l.level];
@@ -21,7 +22,7 @@
       hl.title = rs.length ? rs.join(' · ') : 'Alles in Ordnung' + (l.live ? '' : ' (keine Sendung)');
     } else hl.hidden = true;
     const go = $('#hb-go');                                      // Live-Knopf auch in der Kopfzeile (Computer)
-    if (s && Neu.live) { const st = Neu.live.state(s); go.hidden = false; go.replaceChildren(Neu.ico(st.icon, 'sm'), h('span', { text: st.label })); go.dataset.variant = st.variant; go.disabled = !!st.busy; if (st.dim) go.dataset.dim = ''; else delete go.dataset.dim; }
+    if (s && Neu.live) { const st = Neu.live.state(s); go.hidden = false; const gk = st.icon + '|' + st.label; if (go.dataset.k !== gk) { go.dataset.k = gk; go.replaceChildren(Neu.ico(st.icon, 'sm'), h('span', { text: st.label })); } go.dataset.variant = st.variant; go.disabled = !!st.busy; if (st.dim) go.dataset.dim = ''; else delete go.dataset.dim; }
   }
   $('#hb-go').addEventListener('click', () => Neu.live && Neu.live.go());
   App.on('send', head); App.on('metrics', head);

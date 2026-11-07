@@ -3,7 +3,7 @@
   'use strict';
   const { h, $, App, fmt } = Neu;
   const box = $('#hb-meters'), sig = $('#hb-sig'), dots = $('#hb-dots'), line = $('#hb-line'), val = $('#hb-sigv'), smax = $('#hb-smax'), smid = $('#hb-smid'), smin = $('#hb-smin');
-  const WIN = 30000, pts = []; let okAt = 0, lastM = null;
+  const WIN = 30000, pts = []; let okAt = 0, lastM = null, dotsSig = '';
 
   /* Upload der gewählten Leitungen (Mbit/s); bei Nutzdaten der kleinere Wert, wie in der bisherigen Oberfläche */
   function upTotal(m) {
@@ -42,6 +42,8 @@
   const quiet = c => c.parked ? 2 : (c.state === 'live' || c.state === 'unknown' ? 0 : 1);
   function drawDots(m) {
     const l = (m.cameras || []).filter(c => !c.parked).sort((a, b) => quiet(a) - quiet(b)).slice(0, 4);
+    const sg = JSON.stringify(l.map(c => [camTone(c), camTitle(c)]));      // nur neu bauen, wenn sich ein Punkt ändert
+    if (sg === dotsSig) return; dotsSig = sg;
     dots.replaceChildren(...l.map(c => h('span', { class: 'hdot', data: camTone(c) ? { tone: camTone(c) } : {}, title: camTitle(c) })));
     dots.setAttribute('aria-label', l.map(camTitle).join('; '));
   }
