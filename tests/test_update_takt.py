@@ -68,6 +68,9 @@ class TestUpdateTakt(unittest.TestCase):
             Send._active = staticmethod(lambda: True)
             u.check()
             self.assertFalse(os.path.exists(req))
+            # auf Knopfdruck aber auch dann (kleine Abfrage, niedrige Priorität)
+            u.check(force=True)
+            self.assertTrue(os.path.exists(req))
 
     def test_meldung_bei_abfragegrenze(self):
         import io
