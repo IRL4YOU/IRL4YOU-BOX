@@ -100,12 +100,21 @@ class TestFusszeileUndLinks(unittest.TestCase):
         kopf = _read(os.path.join(WEB, "neu", "kopf.js"))
         self.assertIn("if (sg === dotsSig) return;", kopf)
 
+    def test_verbindungsanzeige_ohne_beschriftung_mit_breitem_graph(self):
+        # ohne das Wort "Verbindung" bleibt mehr Platz: der Graph ist doppelt so breit
+        index = _read(os.path.join(WEB, "neu", "index.html"))
+        sig = index[index.index('id="hb-sig"'):index.index('class="hcams"')]
+        self.assertNotIn("Verbindung</span>", sig)
+        css = _read(os.path.join(WEB, "neu", "app.css"))
+        self.assertIn(".hsig svg { width: 7.5rem;", css)
+
     def test_weg_zur_bisherigen_oberflaeche_fuehrt_nach_alt(self):
         # "/" ist die neue Oberfläche: der Wechsel im Menü am Handy und unter System muss nach /alt gehen, sonst bleibt man in der neuen
         boot = _read(os.path.join(WEB, "neu", "boot.js"))
         self.assertIn("Neu.toOld = () => { toOld(); location.href = '/alt'; };", boot)
         index = _read(os.path.join(WEB, "neu", "index.html"))
         self.assertIn('href="/alt" id="oldui"', index)
+        self.assertIn('<a href="/alt" data-oldui>Bisherige Oberfläche</a>', index)      # auch in der Fußzeile (am Handy fehlt die Seitenleiste)
 
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))

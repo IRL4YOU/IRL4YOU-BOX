@@ -466,6 +466,7 @@ class TestInstall(Base):
         self.u.install()
         self.assertEqual(self.u.run("install"), 2)
         self.assertIn("Keine neuere Version", self.status()["message"])
+        self.assertEqual(self.status()["state"], "idle")      # kein Fehler: in der Oberfläche nicht rot
 
     def test_ci_pending_blocks_but_explicit_sha_does_not(self):
         c = self.gh.add(ci="pending")
