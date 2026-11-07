@@ -23,7 +23,12 @@ HDMI_STATUS = "/sys/kernel/debug/hdmirx/status"
 HDMI_AUDIO = "hw:CARD=rockchiphdmiin"
 KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 DEFAULTS = {"enabled": False, "key": "hdmi", "bitrate": 8000, "fps": 30, "audio": "hdmi", "source": "hdmi", "usb_format": "auto"}
-SOURCE_CHOICES = ("hdmi", "usb")
+SOURCE_CHOICES = ("hdmi", "usb", "test")
+TEST_SIZE = (1280, 720)
+TEST_TONES = ((440, -1), (660, 1))
+TEST_LOGO = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='3' y='3' width='58' height='58' rx='14' fill='#0f172a' stroke='#22d3ee' stroke-width='4'/>"
+             "<path d='M38 49V14L17 39h29' fill='none' stroke='#f8fafc' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/>"
+             "<circle cx='49' cy='15' r='6' fill='#fb923c' stroke='#0f172a' stroke-width='2'/></svg>")
 USB_FORMAT_CHOICES = ("auto", "mjpeg", "h264")
 SYS_V4L = "/sys/class/video4linux"
 PROC_ASOUND = "/proc/asound"
@@ -105,7 +110,7 @@ def clean_settings(d, current=None):
         out["audio"] = d["audio"]
     if "source" in d:
         if d["source"] not in SOURCE_CHOICES:
-            raise ValueError("Quelle: HDMI-Eingang oder USB-Webcam")
+            raise ValueError("Quelle: HDMI-Eingang, USB-Webcam oder Testbild")
         out["source"] = d["source"]
     if "usb_format" in d:
         if d["usb_format"] not in USB_FORMAT_CHOICES:
@@ -138,6 +143,50 @@ def feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, device=HDMI_DEVICE,
     else:
         a = ["audiotestsrc", "wave=silence", "is-live=true", "!", "audio/x-raw,rate=48000,channels=2", "!",
              "voaacenc", "bitrate=128000", "!", "aacparse", "!", "queue", "!", "mux."]
+    sink = ["flvmux", "name=mux", "streamable=true", "!", "rtmpsink", "location=rtmp://127.0.0.1:%d/%s/%s" % (rtmp_port, rtmp_app, cfg["key"])]
+    return ["gst-launch-1.0", "-q"] + v + a + sink
+
+
+_ELEMENT_DA = {}
+
+
+def gst_element_da(name):
+    if name not in _ELEMENT_DA:
+        try:
+            _ELEMENT_DA[name] = subprocess.run(["gst-inspect-1.0", name], capture_output=True, timeout=10).returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            _ELEMENT_DA[name] = False
+    return _ELEMENT_DA[name]
+
+
+def test_feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, logo=None):
+    """Einspeisung der Quelle "test": bewegtes Wellenmuster mit Beschriftung, Zeit und Logo; Ton: Stereo-Testton (links 440, rechts 660 Hz) oder Stille."""
+    cfg = clean_settings(cfg)
+    if not (isinstance(rtmp_app, str) and re.match(r"^[a-z0-9_]{1,20}$", rtmp_app)) or not isinstance(rtmp_port, int):
+        raise ValueError("RTMP-Ziel ungültig")
+    if logo is None:
+        logo = gst_element_da("rsvgoverlay")
+    w, h = TEST_SIZE
+    size = max(64, int(h * 0.18))
+    q = ["queue", "max-size-buffers=4", "max-size-bytes=0", "max-size-time=0", "!"]
+    font = ["font-desc=Monospace Bold 36", "color=4294967040", "outline-color=4278190080", "shaded-background=true", "!"]
+    v = ["videotestsrc", "is-live=true", "pattern=zone-plate", "kx2=15", "ky2=15", "kt=3", "!",
+         "video/x-raw,format=BGRA,width=%d,height=%d,framerate=%d/1" % (w, h, cfg["fps"]), "!"] + q + [
+         "textoverlay", "text=IRL4YOU BOX Testbild", "valignment=top", "halignment=left"] + font + q + [
+         "timeoverlay", "valignment=bottom", "halignment=left"] + font + q + [
+         *(["rsvgoverlay", "data=" + TEST_LOGO, "x=%d" % (w - size - 26), "y=%d" % (h - size - 22), "width=%d" % size, "height=%d" % size, "!"] if logo else []),
+         "videoconvert", "!", "video/x-raw,format=NV12", "!"] + q + [
+         "mpph264enc", "bps=%d" % (cfg["bitrate"] * 1000), "gop=%d" % cfg["fps"], "!",
+         "h264parse", "config-interval=-1", "!", "queue", "!", "mux."]
+    if cfg["audio"] == "none":
+        a = ["audiotestsrc", "is-live=true", "wave=silence", "!", "audio/x-raw,rate=48000,channels=2", "!"]
+    else:
+        a = []
+        for freq, pan in TEST_TONES:
+            a += ["audiotestsrc", "is-live=true", "wave=sine", "freq=%d" % freq, "volume=0.1", "!", "audio/x-raw,rate=48000,channels=1", "!",
+                  "audioconvert", "!", "audiopanorama", "panorama=%d" % pan, "!", "queue", "!", "amix."]
+        a += ["audiomixer", "name=amix", "!", "audio/x-raw,rate=48000,channels=2", "!"]
+    a += ["voaacenc", "bitrate=128000", "!", "aacparse", "!", "queue", "!", "mux."]
     sink = ["flvmux", "name=mux", "streamable=true", "!", "rtmpsink", "location=rtmp://127.0.0.1:%d/%s/%s" % (rtmp_port, rtmp_app, cfg["key"])]
     return ["gst-launch-1.0", "-q"] + v + a + sink
 
@@ -400,7 +449,7 @@ class Daemon:
 
     @property
     def available(self):
-        if self.cfg.get("source") == "usb":
+        if self.cfg.get("source") in ("usb", "test"):
             return True
         return os.path.exists(self.device)
 
@@ -467,6 +516,11 @@ class Daemon:
             return f.read(4096)
 
     async def read_signal(self):
+        if self.cfg.get("source") == "test":
+            self.signal_known = True
+            sig = parse_hdmirx_status("")
+            sig.update(plugged=True, locked=True, width=TEST_SIZE[0], height=TEST_SIZE[1], fps=float(self.cfg["fps"]), device="test")
+            return sig
         if self.cfg.get("source") == "usb":
             cam = self._usb_pick()
             self.signal_known = True
@@ -519,7 +573,11 @@ class Daemon:
         return usb_feeder_argv(self.cfg, cam["node"], cand, audio, self.rtmp_port, self.rtmp_app, cam.get("name", "")), cand
 
     async def _start(self, sig):
-        if self.cfg.get("source") == "usb":
+        if self.cfg.get("source") == "test":
+            loop = asyncio.get_event_loop()
+            logo = await loop.run_in_executor(None, gst_element_da, "rsvgoverlay")
+            argv = test_feeder_argv(self.cfg, self.rtmp_port, self.rtmp_app, logo)
+        elif self.cfg.get("source") == "usb":
             argv, cand = await self._usb_argv()
             if argv is None:
                 return
