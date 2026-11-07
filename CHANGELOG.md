@@ -13,3 +13,4 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - Schalter in der Oberfläche sind nur noch selbst anklickbar; Stream-ID des Servers lässt sich anzeigen.
 - Testbild als Kamera-Quelle: bewegtes Wellenmuster mit Schrift, Zeit und Logo, Stereo-Testton (links 440, rechts 660 Hz).
 - Leitungstest: Knopf „Testen“ je Leitung und „Alle Leitungen testen“ (Herunterladen, Hochladen, Antwortzeit, auch während der Sendung).
+- „Nach Updates suchen“ wartet auf das Ergebnis und meldet es, auch während einer Sendung.
