@@ -107,7 +107,7 @@ def line():
     return (f"{time.strftime('%H:%M:%S')} load={'/'.join(load)} temp={max(temps) if temps else '?'}C "
             f"mhz={'/'.join(map(str, freq[:8]))} memfree={mem.get('MemAvailable', 0) // 1024}M "
             f"eth1={'ja' if os.path.exists('/sys/class/net/eth1') else 'nein'} "
-            f"encoder={'ja' if 'irl4you-encoder' in names else 'nein'} srtla={'ja' if 'srtla_send' in names else 'nein'} "
+            f"encoder={'ja' if 'irl4you-encoder' in names else 'nein'} srtla={'ja' if 'irl4you-srtla' in names else 'nein'} "
             f"bt={len(glob.glob('/sys/class/bluetooth/hci[0-9]'))} {cpu}" + (" " + extra if extra else ""))
 
 
