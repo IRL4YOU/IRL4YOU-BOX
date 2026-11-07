@@ -74,7 +74,7 @@ class SwUpdate:
 
     def check(self, force=False, fresh=False):
         """Der Helfer prüft selbst (Timer alle 2 Stunden). Hier eine Prüfung anstoßen: auf Wunsch (force) oder wenn noch keine da ist bzw. die letzte älter als STALE ist
-        (nach dem Start, beim Öffnen der Karte); sie läuft nie während einer Sendung."""
+        (nach dem Start, beim Öffnen der Karte). Auf Wunsch geht sie auch während einer Sendung (eine kleine Abfrage mit niedriger Priorität), von selbst nicht."""
         if self.demo:
             return {"checked": int(time.time()), "latest": "b7c3d21", "available": True, "notes": "- Beispiel für einen neuen Stand."}
         st = self._status_file()
@@ -85,7 +85,7 @@ class SwUpdate:
         veraltet = alt > self.STALE
         jetzt = time.time()
         frei = jetzt - self.asked > self.CHECK_WAIT if force else jetzt - self.asked_auto > self.AUTO_WAIT
-        if (force or veraltet) and st.get("state") not in ("installing", "checking") and frei and not self.send._active() \
+        if (force or veraltet) and st.get("state") not in ("installing", "checking") and frei and (force or not self.send._active()) \
                 and os.path.exists(self.HELPER):
             if force:
                 self.asked = jetzt
