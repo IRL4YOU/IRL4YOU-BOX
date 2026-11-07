@@ -23,6 +23,8 @@ class SwUpdate:
     STAGE = ""
     UPDATER_STATUS_MAX_AGE = 6 * 3600
     CHECK_WAIT = 20            # so lange nach einer Anfrage nicht gleich noch eine stellen
+    STALE = 60 * 60            # ist die letzte Prüfung älter (oder fehlt sie nach dem Start), stößt das Öffnen der Karte eine neue an
+    AUTO_WAIT = 15 * 60        # solche selbstständigen Anfragen höchstens alle 15 Minuten, auch wenn die Prüfung scheitert (kein Netz)
     HEX_RE = re.compile(r"^[0-9a-f]{7,40}$")
     ID_RE = re.compile(r"^[0-9a-f]{12}$")
 
@@ -31,6 +33,7 @@ class SwUpdate:
         self.demo, self.send = demo, send
         self.lock = threading.Lock()
         self.asked = 0.0
+        self.asked_auto = 0.0
         here = APP_DIR
         self.version = (read(os.path.join(here, "VERSION"), "") or "0.0.0").strip()
         self.fake = {}
@@ -70,13 +73,23 @@ class SwUpdate:
             f.write(text)
 
     def check(self, force=False, fresh=False):
-        """Der Helfer prüft selbst (Timer alle 6 Stunden). Hier nur auf Wunsch (force) eine Prüfung anstoßen; sie läuft nie während einer Sendung."""
+        """Der Helfer prüft selbst (Timer alle 2 Stunden). Hier eine Prüfung anstoßen: auf Wunsch (force) oder wenn noch keine da ist bzw. die letzte älter als STALE ist
+        (nach dem Start, beim Öffnen der Karte); sie läuft nie während einer Sendung."""
         if self.demo:
             return {"checked": int(time.time()), "latest": "b7c3d21", "available": True, "notes": "- Beispiel für einen neuen Stand."}
         st = self._status_file()
-        if force and st.get("state") not in ("installing", "checking") and time.time() - self.asked > self.CHECK_WAIT and not self.send._active() \
+        try:
+            alt = time.time() - float(st.get("checked") or 0)
+        except (TypeError, ValueError):
+            alt = self.STALE + 1
+        veraltet = alt > self.STALE
+        jetzt = time.time()
+        frei = jetzt - self.asked > self.CHECK_WAIT if force else jetzt - self.asked_auto > self.AUTO_WAIT
+        if (force or veraltet) and st.get("state") not in ("installing", "checking") and frei and not self.send._active() \
                 and os.path.exists(self.HELPER):
-            self.asked = time.time()
+            if force:
+                self.asked = jetzt
+            self.asked_auto = jetzt
             try:
                 self._write_request("check\n")
             except OSError:
