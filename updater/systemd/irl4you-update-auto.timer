@@ -3,8 +3,8 @@ Description=IRL4YOU sucht regelmäßig nach Updates
 
 [Timer]
 OnBootSec=10min
-OnUnitActiveSec=6h
-RandomizedDelaySec=30min
+OnUnitActiveSec=1h
+RandomizedDelaySec=10min
 Persistent=true
 
 [Install]
