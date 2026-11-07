@@ -189,6 +189,21 @@ def unblock_hci(hci, bt_root=SYSFS_BT):
     return done
 
 
+def adapters(bt_root=SYSFS_BT):
+    """Alle Bluetooth-Adapter, die der Kernel schon eingerichtet hat (hci0, hci1 …), auch die mit dem eingebauten Treiber."""
+    try:
+        return sorted(n for n in os.listdir(bt_root) if re.fullmatch(r"hci\d+", n))
+    except OSError:
+        return []
+
+
+def keine_hilfe_noetig(vorhanden):
+    """Meldung, wenn kein Stick einen zusätzlichen Treiber braucht: stimmt zur Anzeige der Adapter (bereit) statt „kein Stick“ zu behaupten."""
+    if vorhanden:
+        return "Alle Bluetooth-Adapter dieser Box laufen schon mit dem eingebauten Treiber. Es ist nichts einzurichten."
+    return "Es ist kein Bluetooth-Adapter da. Ein Stick braucht erst dann einen zusätzlichen Treiber, wenn er steckt und nicht bereit ist."
+
+
 def stream_running():
     return subprocess.run(["pgrep", "-x", "irl4you-encoder"], capture_output=True).returncode == 0
 
@@ -200,7 +215,7 @@ def do_auto(force=False):
         status(manual=bool(force), **kw)
     if not need:
         if force:
-            st(state="none", ids=[], message="Es steckt kein Bluetooth-Stick, den dieser Helfer betreut.")
+            st(state="none", ids=[], message=keine_hilfe_noetig(adapters()))
         return 0
     names = ", ".join(need.values())
     ids = sorted(need)
