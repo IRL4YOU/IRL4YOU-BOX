@@ -81,21 +81,25 @@ class TestTakt(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == "linux", "dd, stat und sha256sum wie unter Linux")
 class TestFirmwareWerkzeug(unittest.TestCase):
+    BOARD_DIR = "rock-5b-plus"
+    MODELL = b"Radxa ROCK 5B+\0"
+    LABEL = "aktiv: rock-5b-plus-armbian"
+
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp, True)
         tool = os.path.join(self.tmp, "tool")
-        os.makedirs(os.path.join(tool, "rock-5b-plus", "armbian"))
+        os.makedirs(os.path.join(tool, self.BOARD_DIR, "armbian"))
         shutil.copy(BOOTTOOL, tool)
         self.region = os.urandom(512 * 40)
-        with open(os.path.join(tool, "rock-5b-plus", "armbian", "region.bin"), "wb") as f:
+        with open(os.path.join(tool, self.BOARD_DIR, "armbian", "region.bin"), "wb") as f:
             f.write(self.region)
         self.dev = os.path.join(self.tmp, "dev.img")
         with open(self.dev, "wb") as f:
             f.write(b"\0" * (1 << 20))
         self.model = os.path.join(self.tmp, "model")
         with open(self.model, "wb") as f:
-            f.write(b"Radxa ROCK 5B+\0")
+            f.write(self.MODELL)
         self.script = os.path.join(tool, "irl4you-bootloader.sh")
         self.env = dict(os.environ, DEV=self.dev, MODEL_FILE=self.model, DEV_TEST="1", BK=os.path.join(self.tmp, "bk"))
 
@@ -112,7 +116,7 @@ class TestFirmwareWerkzeug(unittest.TestCase):
             self.assertEqual(f.read(len(self.region)), self.region)
             f.seek(0)
             self.assertEqual(f.read(64 * 512), b"\0" * (64 * 512), "Sektor 0 bis 63 bleiben unberührt")
-        self.assertTrue(self.run_tool("status").stdout.startswith("aktiv: rock-5b-plus-armbian"))
+        self.assertTrue(self.run_tool("status").stdout.startswith(self.LABEL))
         self.assertIn("schon aktiv", self.run_tool("apply").stdout)
         self.assertEqual(len(os.listdir(os.path.join(self.tmp, "bk"))), 1, "Sicherung des Ist-Stands")
         self.assertEqual(os.path.getsize(self.dev), 1 << 20, "Gerät bleibt gleich groß")
@@ -125,11 +129,25 @@ class TestFirmwareWerkzeug(unittest.TestCase):
         self.assertIn("nicht unterstützt", r.stdout)
 
     def test_stand_ist_mitgeliefert(self):
-        p = os.path.join(BOOT, "rock-5b-plus", "armbian", "region.bin")
+        p = os.path.join(BOOT, self.BOARD_DIR, "armbian", "region.bin")
         self.assertTrue(os.path.getsize(p) > (1 << 20) and os.path.getsize(p) % 512 == 0)
         self.assertTrue(os.path.exists(os.path.join(os.path.dirname(p), "QUELLE.md")))
         with open(p, "rb") as f:
             self.assertEqual(f.read(4), b"RKNS", "Rockchip-Kopf des Startabbilds")
+
+
+class TestFirmwareWerkzeugOrangePi(TestFirmwareWerkzeug):
+    BOARD_DIR = "orange-pi-5-plus"
+    MODELL = b"Orange Pi 5 Plus\0"
+    LABEL = "aktiv: orange-pi-5-plus-armbian"
+
+    def test_stand_passt_zum_image(self):
+        # Das Startabbild kennt Orange Pi 5 Plus und den extlinux-Weg mit dem DTB-Namen, den das Image mitbringt
+        with open(os.path.join(BOOT, self.BOARD_DIR, "armbian", "region.bin"), "rb") as f:
+            d = f.read()
+        self.assertIn(b"fdtfile=rockchip/rk3588-orangepi-5-plus.dtb", d)
+        self.assertIn(b"extlinux/extlinux.conf", d)
+        self.assertEqual(d.count(b"Orange Pi 5 Plus") > 0, True)
 
 
 class TestLueftertakt(unittest.TestCase):
@@ -206,10 +224,13 @@ class TestImageBau(unittest.TestCase):
 
     def test_boards_getrennt(self):
         fixes = _text(os.path.join(INSTALL, "system-base-fixes.sh"))
-        # Firmware-Dateien: nur die ROCK bekommt ihren Ordner, andere Boards keine, alte Orange-Pi-Dateien werden entfernt
+        # Firmware-Dateien: jedes Board nur seinen Ordner, andere Boards keinen, alte Orange-Pi-Dateien werden entfernt
         i = fixes.index('cp -R "$HERE/bootloader/rock-5b-plus"')
+        j = fixes.index('cp -R "$HERE/bootloader/orange-pi-5-plus"')
         self.assertLess(fixes.rindex('*"ROCK 5B+"*', 0, i), i)
-        self.assertLess(i, fixes.index("esac", i))
+        self.assertLess(fixes.rindex('*"Orange Pi 5 Plus"*', 0, j), j)
+        self.assertLess(i, j)
+        self.assertLess(j, fixes.index("esac", j))
         self.assertNotIn('bootloader/*.bin', fixes)
         self.assertIn('rm -f /usr/share/irl4you/bootloader/fit-opi5plus-*.bin', fixes)
         # andere Boards: ROCK-Lüfter und ASPM-Datei werden entfernt, nie gesetzt
