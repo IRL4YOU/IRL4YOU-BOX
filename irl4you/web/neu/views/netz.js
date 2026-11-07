@@ -5,7 +5,7 @@
 
   view('netz', sec => {
     const leitungen = h('div', { class: 'stack' }), server = h('div', { class: 'stack' });
-    const CAN_TEST = false;  /* Leitungstest: Dienst fehlt in der Box (Stand 0.3) */
+    const CAN_TEST = true;
     const allBtn = btn('Alle Leitungen testen', { ico: 'activity', onclick: () => startTest({ all: true }) });
     sec.append(pageHead('Netzwerk', null, CAN_TEST ? [allBtn] : []));
     const T = Neu.slots.netz = Neu.tabbed(sec, 'Netzwerk');
