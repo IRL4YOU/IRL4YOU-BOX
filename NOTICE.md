@@ -40,6 +40,7 @@ Die Pakete in `irl4you/debs/` sind für die Box gebaut. Der Quelltext der Fremdp
 | WLAN-Treiber AIC8800 (`irl4you-wifi-aic8800`) | [shenmintao/aic8800d80](https://github.com/shenmintao/aic8800d80), Zweig `legacy-mcu1` | GPL-2.0, Firmware des Herstellers | Kernelmodul für Kernel 6.1.172 |
 | Linux-Kernel (Rockchip BSP 6.1) | [armbian/linux-rockchip](https://github.com/armbian/linux-rockchip) | GPL-2.0 | Quelle für Kernelbaum und Module |
 | Firmware-Stand ROCK 5B+ (`irl4you/install/bootloader/rock-5b-plus/armbian/region.bin`) | unverändert aus dem Armbian-Image 26.8.3: U-Boot 2026.04 ([u-boot](https://source.denx.de/u-boot/u-boot), Bau durch [armbian/build](https://github.com/armbian/build)), TF-A v2.13 ([ARM-software/arm-trusted-firmware](https://github.com/ARM-software/arm-trusted-firmware)), DDR-Initialisierung von Rockchip ([rockchip-linux/rkbin](https://github.com/rockchip-linux/rkbin)) | GPL-2.0-or-later (U-Boot), BSD-3-Clause (TF-A), Binärdatei von Rockchip | Quelle und Prüfsumme des Images in `QUELLE.md` neben der Datei |
+| Firmware-Stand Orange Pi 5 Plus (`irl4you/install/bootloader/orange-pi-5-plus/armbian/region.bin`) | unverändert aus dem Armbian-Image 26.8.2: U-Boot 2017.09 im Rockchip-Vendorzweig (Bau durch [armbian/build](https://github.com/armbian/build)), TF-A BL31 v1.48 ([ARM-software/arm-trusted-firmware](https://github.com/ARM-software/arm-trusted-firmware)), DDR-Initialisierung v1.20 von Rockchip ([rockchip-linux/rkbin](https://github.com/rockchip-linux/rkbin)) | GPL-2.0-or-later (U-Boot), BSD-3-Clause (TF-A), Binärdatei von Rockchip | Quelle und Prüfsumme des Images in `QUELLE.md` neben der Datei |
 | bleak 3.0.2, dbus-fast 5.2.0 | PyPI | MIT / MIT | per `pip` bei der Installation geladen, nicht mitgeliefert |
 | GStreamer, libsrt, OpenSSL, nginx, NetworkManager, Python, Tailscale u. a. | Ubuntu 26.04 bzw. Tailscale-Paketquelle | jeweils eigene Lizenz (u. a. LGPL, MPL-2.0, Apache-2.0, BSD) | Systempakete, nicht verändert |
 
@@ -55,7 +56,7 @@ Der Chat lädt Emotes zur Laufzeit von Twitch, BetterTTV, FrankerFaceZ und 7TV. 
 
 - **CC BY-ND 4.0**: der eigene Code dieses Repositorys (Nutzung auch kommerziell erlaubt, Änderungen nur nach Rückfrage bei [Bittersweet1987](https://discord.com/users/232451293040476160) oder [Akinos01](https://discord.com/users/523858990510243861), Ausnahme IRL4YOU; siehe `ZUSATZERLAUBNIS.md`). Die Lizenz gilt auch für frühere Versionen; was jemand vor dem 18.10.2026 unter MIT erhalten hat, behält die damals gewährten Rechte. Der Moblin-Hinweis oben bleibt bestehen.
 - **MIT** (Fremdcode): Moblin-Ablauf, SRS, bleak, dbus-fast.
-- **GPL-2.0**: Kernel, die beiden WLAN-Treiber und U-Boot im Firmware-Stand der ROCK 5B+. Die Pakete enthalten die gebauten Module; der Quelltext ist über die oben genannten Quellen und die Bauskripte in `build/` erreichbar.
+- **GPL-2.0**: Kernel, die beiden WLAN-Treiber und U-Boot in den Firmware-Ständen der ROCK 5B+ und der Orange Pi 5 Plus. Die Pakete enthalten die gebauten Module; der Quelltext ist über die oben genannten Quellen und die Bauskripte in `build/` erreichbar.
 - **MIT, Apache-2.0, LGPL**: SRS, MPP und librga (MIT bzw. Apache-2.0), gstreamer-rockchip (LGPL) (siehe Tabelle).
 
 ## Lizenztexte
