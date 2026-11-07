@@ -1,0 +1,21 @@
+[Unit]
+Description=ROCK 5B Plus temperature controlled fan
+After=systemd-udev-trigger.service
+ConditionPathExists=/sys/devices/platform/pwm-fan
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Nur die ROCK 5B+: die Orange Pi 5 Plus hat ebenfalls einen PWM-Luefter, der aber vom Kernel geregelt wird
+ExecCondition=/bin/grep -a -q -F -e "ROCK 5B+" -e "ROCK 5B Plus" /proc/device-tree/model
+ExecStart=/usr/local/bin/rock5bplus-fan.sh
+Restart=always
+RestartSec=10
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
+LogRateLimitIntervalSec=60s
+LogRateLimitBurst=6
+
+[Install]
+WantedBy=multi-user.target

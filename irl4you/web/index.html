@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<script src="/i18n.js"></script>
+<script src="/ui/js/00-theme-init.js"></script>
+<title>IRL4YOU BOX</title>
+<link rel="stylesheet" href="/ui/css/00-ds-tokens.css">
+<link rel="stylesheet" href="/ui/css/00-ds-theme-standard.css">
+<link rel="stylesheet" href="/ui/css/00-ds-theme-klar.css">
+<link rel="stylesheet" href="/ui/css/00-ds-theme-kompakt.css">
+<link rel="stylesheet" href="/ui/css/00-ds-theme-kompakt-std.css">
+<link rel="stylesheet" href="/ui/css/00-ds-theme-kontrast.css">
+<link rel="stylesheet" href="/ui/css/00-ds-theme-cockpit.css">
+<link rel="stylesheet" href="/ui/css/00-ds-theme-mischpult.css">
+<link rel="stylesheet" href="/ui/css/00-ds-text.css">
+<link rel="stylesheet" href="/ui/css/00-ds-card.css">
+<link rel="stylesheet" href="/ui/css/00-ds-button.css">
+<link rel="stylesheet" href="/ui/css/00-ds-form.css">
+<link rel="stylesheet" href="/ui/css/00-ds-status.css">
+<link rel="stylesheet" href="/ui/css/01-root.css">
+<link rel="stylesheet" href="/ui/css/02-prog.css">
+<link rel="stylesheet" href="/ui/css/03-camdots.css">
+<link rel="stylesheet" href="/ui/css/04-wstat.css">
+<link rel="stylesheet" href="/ui/css/05-statbox.css">
+<link rel="stylesheet" href="/ui/css/06-media.css">
+<link rel="stylesheet" href="/ui/css/07-sw-notes.css">
+<link rel="stylesheet" href="/ui/css/08-wcard.css">
+<link rel="stylesheet" href="/ui/css/09-err.css">
+<link rel="stylesheet" href="/ui/css/10-html.css">
+<link rel="stylesheet" href="/ui/css/11-where-html.css">
+<link rel="stylesheet" href="/ui/css/12-html.css">
+<link rel="stylesheet" href="/ui/css/13-html.css">
+<link rel="stylesheet" href="/ui/css/14-html.css">
+<link rel="stylesheet" href="/ui/css/15-foot2.css">
+<link rel="stylesheet" href="/chat.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+</head>
+<body>
+<header><h1 class="hl" aria-label="IRL4YOU BOX"><span class="hlogo"><svg viewBox="0 0 1024 1024" width="26" height="26" aria-hidden="true" focusable="false"><defs><mask id="hl4m"><rect width="1024" height="1024" fill="#fff"/><circle cx="757" cy="267" r="102" fill="#000"/></mask></defs><circle cx="512" cy="512" r="472" fill="#12213c"/><circle cx="512" cy="512" r="448" fill="none" stroke="#1cdaf5" stroke-width="48" mask="url(#hl4m)"/><path d="M599 252 295 612H715M599 252V757" fill="none" stroke="#f8fafc" stroke-width="100" stroke-linecap="round" stroke-linejoin="round"/><circle cx="757" cy="267" r="72" fill="#ffa14f"/></svg></span><span class="htxt">IRL4YOU BOX</span></h1><span class="hdr"><span id="hdr_sig"></span><button type="button" id="hdr_upd" class="updbtn" hidden aria-label="Neue Version verfügbar, zum Software-Update" title="Neue Version verfügbar"><span class="dot wait"></span><span class="u1">Update </span>Oberfläche</button>
+<span class="foldd"><button type="button" class="sec small" id="fold_all">Alle zuklappen</button><button type="button" class="sec small" id="unfold_all">Alle aufklappen</button></span>
+<button type="button" class="sec small foldm" id="fold_toggle" title="Alle Karten zu- oder aufklappen" aria-label="Alle Karten zu- oder aufklappen">⇕</button>
+<select id="lang_sel" data-lang translate="no" class="sec small" aria-label="Language" title="Language"></select>
+<button type="button" class="sec small" id="pb_awake" aria-pressed="false" title="Bildschirm anlassen" aria-label="Bildschirm anlassen">💡</button>
+<button type="button" class="sec small" id="theme_btn" aria-label="Hell oder dunkel" title="Hell oder dunkel"></button>
+<button type="button" class="sec small" id="sm_btn" title="Streammodus: blendet Adressen, Namen und Protokolle aus, z. B. wenn der Bildschirm gefilmt wird" aria-label="Streammodus"><span class="smic">👁</span><span class="smtx">Streammodus: aus</span></button>
+<button type="button" id="hdr_live" class="livebtn" hidden aria-label="Sendung starten oder beenden">Live</button><button type="button" id="hdr_more" class="sec small" aria-expanded="false" aria-label="Weitere Knöpfe ein- oder ausklappen" title="Weitere Knöpfe ein- oder ausklappen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button></span></header>
+<main>
+<!--#include livecard.html-->
+<!--#include c_prev.html-->
+<!--#include c_chat.html-->
+<!--#include c_hub.html-->
+<!--#include c_deck.html-->
+<!--#include c_status.html-->
+<!--#include netcard.html-->
+<!--#include srtlacard.html-->
+<!--#include c_cams.html-->
+<!--#include pipecard.html-->
+<!--#include c_ctl.html-->
+<!--#include rcard.html-->
+<!--#include swcard.html-->
+<!--#include c_logs.html-->
+<!--#include c_bk.html-->
+<!--#include c_dev.html-->
+<!--#include c_layout.html-->
+<!--#include c_power.html-->
+</main>
+<nav id="mfoot" aria-label="Schnellzugriff"><div id="mf_msg" class="mf-msg" role="status" hidden></div><button type="button" id="mf_live" class="mf-live" disabled aria-label="Sendung starten oder beenden">Live</button><div id="mf_tools" role="group" aria-label="Kameras und Ton" hidden></div><div id="mf_p2" role="group" aria-label="Rotation und Sperre"><button type="button" id="mf_rot" class="mf-t mf-p2" aria-pressed="false" title="Kamera-Rotation ein- oder ausschalten"><span class="mf-ic" aria-hidden="true">⟳</span><span>Rotation</span><span class="mf-state"></span></button><button type="button" id="mf_rotset" class="mf-t mf-p2" title="Einstellungen der Kamera-Rotation"><span class="mf-ic" aria-hidden="true">⚙</span><span>Einstellung</span><span class="mf-state">Rotation</span></button><button type="button" id="mf_lock" class="mf-t mf-p2" aria-pressed="false" title="Oberfläche sperren: nichts klappt mehr auf oder zu, die Ansicht bleibt stehen"><span class="mf-ic" aria-hidden="true">🔒</span><span>Sperren</span><span class="mf-state"></span></button></div><div id="mf_side"><button type="button" id="mf_info" class="mf-info" aria-label="Bedienung der Kamera-Knöpfe" title="Bedienung der Kamera-Knöpfe" hidden>ⓘ</button><button type="button" id="mf_page" class="mf-page" aria-pressed="false" aria-label="Zweite Seite der Fußleiste: Rotation und Sperren" title="Zweite Seite: Rotation und Sperren">⇄</button></div></nav>
+<dialog id="rdlg"><form method="dialog"><b>Noch nicht übernommen</b>
+<p id="rdlg_t"></p><p class="muted">Die Sendung läuft noch mit den alten Werten. Ein Neustart unterbricht das Bild für einige Sekunden.</p>
+<div class="actions"><button type="button" id="rdlg_go" class="warnbtn">Stream neu starten</button><button type="submit" class="sec">Später</button></div></form></dialog>
+<div id="updtoast" class="toast" role="status" hidden></div>
+<footer class="foot"><div id="stagefoot"></div>
+<div class="footlinks">© 2026 IRL4YOU · CC BY-ND 4.0 · <a href="/neu">Neue Oberfläche</a> · <a href="https://irl4you.de" target="_blank" rel="noopener noreferrer">Webseite</a> · <a href="https://discord.gg/nrBCEarMup" target="_blank" rel="noopener noreferrer">Discord</a> · <a href="https://github.com/IRL4YOU/IRL4YOU-BOX" target="_blank" rel="noopener noreferrer">Quellcode auf GitHub</a> · <a href="https://github.com/IRL4YOU/IRL4YOU-BOX/blob/main/NOTICE.md" target="_blank" rel="noopener noreferrer">Drittprojekte und Lizenzen</a></div></footer>
+<script src="/ui/js/01-app.js"></script>
+<script src="/ui/js/02-app.js"></script>
+<script src="/ui/js/03-app.js"></script>
+<script src="/ui/js/04-dji.js"></script>
+<script src="/ui/js/05-hdmi.js"></script>
+<script src="/ui/js/06-dev.js"></script>
+<script src="/ui/js/07-hs.js"></script>
+<script src="/ui/js/07-wl.js"></script>
+<script src="/ui/js/08-app.js"></script>
+<script src="/ui/js/09-app.js"></script>
+<script src="/ui/js/10-app.js"></script>
+<script src="/ui/js/11-ss.js"></script>
+<script src="/ui/js/12-sw.js"></script>
+<script src="/ui/js/13-sig.js"></script>
+<script src="/ui/js/14-app.js"></script>
+<script src="/ui/js/15-app.js"></script>
+<script src="/ui/js/16-app.js"></script>
+<script src="/ui/js/17-app.js"></script>
+<script src="/ui/js/17-foot.js"></script>
+<script src="/ui/js/18-app.js"></script>
+<script src="/ui/js/19-bk.js"></script>
+<script src="/ui/js/20-dev.js"></script>
+<script src="/ui/js/21-seg.js"></script>
+<script src="/ui/js/22-yt.js"></script>
+<script src="/ui/js/23-hub.js"></script>
+<script src="/ui/js/24-swipe.js"></script>
+<script src="/ui/js/25-rot.js"></script>
+<script src="/ui/js/26-foot2.js"></script>
+<script src="/ui/js/27-kick.js"></script>
+<script src="/modem.js"></script>
+<script src="/chat.js"></script>
+</body>
+</html>

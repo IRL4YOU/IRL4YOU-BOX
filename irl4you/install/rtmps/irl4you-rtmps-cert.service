@@ -1,0 +1,11 @@
+[Unit]
+Description=IRL4YOU BOX Erststart: eigenes RTMPS-Zertifikat anlegen
+Before=nginx.service
+ConditionPathExists=!/etc/nginx/certs/rtmps/privkey.pem
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/irl4you/irl4you-rtmps-cert.sh
+
+[Install]
+WantedBy=multi-user.target

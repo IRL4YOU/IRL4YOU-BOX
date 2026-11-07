@@ -1,0 +1,135 @@
+"""Favicon (Logo der Box im Browser-Tab) und Stream-ID anzeigen in der Oberflaeche."""
+import os
+import re
+import struct
+import sys
+import tempfile
+import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from test_irl4you import irl, IRL  # noqa: E402
+
+WEB = os.path.join(IRL, "web")
+
+
+def _read(p):
+    with open(p, encoding="utf-8") as f:
+        return f.read()
+
+
+class TestFavicon(unittest.TestCase):
+    def test_dateien(self):
+        d = os.path.join(WEB, "icons")
+        self.assertIn(b"<svg", open(os.path.join(d, "favicon.svg"), "rb").read())
+        png = open(os.path.join(d, "apple-touch-icon.png"), "rb").read()
+        self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(struct.unpack(">II", png[16:24]), (180, 180))
+        ico = open(os.path.join(d, "favicon.ico"), "rb").read()
+        typ, n = struct.unpack("<HH", ico[2:6])
+        self.assertEqual((typ, n), (1, 3))
+        for i in range(n):
+            size, off = struct.unpack("<II", ico[6 + 16 * i + 8:6 + 16 * i + 16])
+            self.assertEqual(ico[off:off + 8], b"\x89PNG\r\n\x1a\n")
+            self.assertLessEqual(off + size, len(ico))
+
+    def test_seiten_verweisen_auf_das_logo(self):
+        for page in ("index.html", "neu/index.html", "login.html", "statistik.html"):
+            h = _read(os.path.join(WEB, page))
+            head = h[:h.index("</head>")]
+            self.assertIn('rel="icon" href="/favicon.svg"', head, page)
+            self.assertIn('href="/favicon.ico"', head, page)
+            self.assertIn('rel="apple-touch-icon" href="/apple-touch-icon.png"', head, page)
+
+    def test_route_ohne_anmeldung(self):
+        r = _read(os.path.join(IRL, "webui", "routes_get.py"))
+        self.assertLess(r.index("if path in ICONS:"), r.index("if not self.authed():"), "Icons muessen vor der Anmeldepruefung kommen")
+        for p in ("/favicon.svg", "/favicon.ico", "/apple-touch-icon.png"):
+            self.assertIn('"%s"' % p, r)
+
+
+class TestStreamIdAnzeigen(unittest.TestCase):
+    def test_store(self):
+        with tempfile.TemporaryDirectory() as d:
+            st = irl("webui.netstate").SrtlaStore(os.path.join(d, "srtla.json"))
+            sid = st.add({"name": "A", "host": "srt.example.de", "port": 5000, "streamid": "geheim123"})
+            self.assertEqual(st.reveal_streamid(sid), "geheim123")
+            leer = st.add({"name": "B", "host": "srt.example.de", "port": 5000, "streamid": ""})
+            self.assertEqual(st.reveal_streamid(leer), "")
+            with self.assertRaises(KeyError):
+                st.reveal_streamid("00000000")
+            self.assertNotIn("geheim123", str(st.public()))     # die Liste verraet die Stream-ID weiterhin nicht
+
+    def test_route_und_oberflaeche(self):
+        p = _read(os.path.join(IRL, "webui", "routes_post.py"))
+        self.assertIn(r'^/api/srtla/([0-9a-f]{8})/streamid$', p)
+        self.assertIn("reveal_streamid", p)
+        # die neue Oberflaeche ruft genau diese Route auf
+        self.assertIn("`/api/srtla/${srv.id}/streamid`", _read(os.path.join(WEB, "neu", "views", "netz.js")))
+        # die Route liegt hinter der Anmeldung: vor ihr steht die Pruefung des Aufrufers
+        i = p.index("/streamid$")
+        self.assertIn("self.authed()", p[:i])
+
+
+class TestFusszeileUndLinks(unittest.TestCase):
+    def test_neue_oberflaeche_hat_die_fusszeile_der_alten(self):
+        neu = _read(os.path.join(WEB, "neu", "index.html"))
+        alt = _read(os.path.join(WEB, "index.html"))
+        for url in ("https://discord.gg/nrBCEarMup", "https://github.com/IRL4YOU/IRL4YOU-BOX",
+                    "https://github.com/IRL4YOU/IRL4YOU-BOX/blob/main/NOTICE.md"):
+            self.assertIn('href="%s"' % url, alt, url)
+            self.assertIn('href="%s"' % url, neu, url)
+        self.assertIn("© 2026 IRL4YOU · CC BY-ND 4.0", neu)
+        # die Fusszeile steht nach dem Inhalt und ausserhalb von #views (das die Ansichten neu fuellen)
+        self.assertLess(neu.index('id="views"'), neu.index('class="legal"'))
+        self.assertIn(".legal", _read(os.path.join(WEB, "neu", "app.css")))
+
+    def test_keine_verweise_auf_alte_repositories(self):
+        for root, _d, files in os.walk(os.path.join(WEB, "neu")):
+            for f in files:
+                if f.endswith((".js", ".html", ".css")):
+                    t = _read(os.path.join(root, f))
+                    self.assertNotIn("irl4you-pip", t, os.path.join(root, f))
+                    self.assertNotIn("irl4you_2604", t, os.path.join(root, f))
+        self.assertIn("https://github.com/IRL4YOU/IRL4YOU-BOX/issues", _read(os.path.join(WEB, "neu", "views", "system.js")))
+
+    def test_leitungstest_bleibt_aus_solange_der_dienst_fehlt(self):
+        # die Oberflaeche ruft /api/uplinktest nur auf, wenn der Schalter an ist; der Server kennt die Route nicht
+        netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
+        self.assertIn("const CAN_TEST = false;", netz)
+        server = _read(os.path.join(IRL, "webui", "routes_get.py")) + _read(os.path.join(IRL, "webui", "routes_post.py"))
+        self.assertNotIn("/api/uplinktest", server)
+
+
+class TestLatenzRegler(unittest.TestCase):
+    def test_latenz_ist_ein_sichtbarer_regler_mit_standard_4000(self):
+        netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
+        self.assertNotIn("disclosure('Erweitert'", netz)
+        self.assertIn("label: 'Latenz', min: 500, max: 8000, step: 100", netz)
+        self.assertIn("draft.latency_ms || 4000", netz)
+        self.assertIn("Standard: 4000 ms", netz)
+        # die Box selbst startet mit 4000 ms und nimmt nur Werte aus ihrem erlaubten Bereich
+        st = _read(os.path.join(IRL, "webui", "netstate.py"))
+        self.assertIn('"latency_ms": 4000', st)
+        self.assertLessEqual(8000, 10000)
+        self.assertGreaterEqual(500, 100)
+
+
+class TestSchalter(unittest.TestCase):
+    def test_nur_der_schalter_ist_klickbar(self):
+        core = _read(os.path.join(WEB, "neu", "core.js"))
+        i = core.index("function sw(")
+        sw = core[i:core.index("function field(", i)]
+        # kein <label> um Schalter und Text: ein Klick auf den Text schaltet nicht mehr um
+        self.assertNotIn("h('label', { class: 'switch'", sw)
+        self.assertIn("h('div', { class: 'switch'", sw)
+        # der Text benennt den Schalter trotzdem fuer Screenreader
+        self.assertIn("'aria-labelledby'", sw)
+        self.assertIn("id: tid", sw)
+        css = _read(os.path.join(WEB, "neu", "ds", "components.css"))
+        regel = [z for z in css.splitlines() if z.strip().startswith(".switch {")][0]
+        self.assertNotIn("cursor: pointer", regel)
+        self.assertIn("cursor: pointer", [z for z in css.splitlines() if ".switch input {" in z][0])
+
+
+if __name__ == "__main__":
+    unittest.main()
