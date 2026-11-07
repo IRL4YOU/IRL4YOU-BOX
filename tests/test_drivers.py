@@ -131,6 +131,15 @@ class Bluetooth(unittest.TestCase):
         self.assertNotIn("kein Bluetooth-Stick", mit)
         self.assertIn("kein Bluetooth-Adapter", ohne)
 
+    def test_dienst_darf_funksperre_aufheben(self):
+        # Das Aufheben der Funksperre (rfkill, "soft") braucht CAP_NET_ADMIN; ohne das Recht scheiterte "Treiber jetzt einrichten" mit "Operation not permitted"
+        with open(os.path.join(IRL, "install", "pipbox-btdriver.service"), encoding="utf-8") as f:
+            unit = f.read()
+        zeile = [x for x in unit.splitlines() if x.startswith("CapabilityBoundingSet=")]
+        self.assertEqual(len(zeile), 1)
+        self.assertIn("CAP_NET_ADMIN", zeile[0])
+        self.assertIn("CAP_SYS_MODULE", zeile[0])
+
     def test_anfrage_nur_mit_inhalt_install(self):
         p = os.path.join(self.root, "req")
         put(p, "install\n")
