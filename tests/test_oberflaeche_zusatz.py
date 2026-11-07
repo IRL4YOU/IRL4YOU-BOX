@@ -92,6 +92,13 @@ class TestFusszeileUndLinks(unittest.TestCase):
                     self.assertNotIn("irl4you_2604", t, os.path.join(root, f))
         self.assertIn("https://github.com/IRL4YOU/IRL4YOU-BOX/issues", _read(os.path.join(WEB, "neu", "views", "system.js")))
 
+    def test_weg_zur_bisherigen_oberflaeche_fuehrt_nach_alt(self):
+        # "/" ist die neue Oberfläche: der Wechsel im Menü am Handy und unter System muss nach /alt gehen, sonst bleibt man in der neuen
+        boot = _read(os.path.join(WEB, "neu", "boot.js"))
+        self.assertIn("Neu.toOld = () => { toOld(); location.href = '/alt'; };", boot)
+        index = _read(os.path.join(WEB, "neu", "index.html"))
+        self.assertIn('href="/alt" id="oldui"', index)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
