@@ -10,8 +10,8 @@ Die Texte sind die Originaldateien der Projekte (Stand 7. November 2026). Wer di
 | gstreamer-rockchip-COPYING.txt | GStreamer-Elemente für MPP (`irl4you-gst-rockchip`) | LGPL-2.1 | https://github.com/JeffyCN/mirrors (Zweig gstreamer-rockchip) |
 | aic8800-LICENSE.txt | WLAN-Treiber AIC8800 (`irl4you-wifi-aic8800`) | GPL-2.0 | https://github.com/shenmintao/aic8800d80 (Zweig legacy-mcu1) |
 | linux-kernel-GPL-2.0.txt,<br>linux-kernel-Linux-syscall-note.txt | Linux-Kernel (Rockchip BSP 6.1) und WLAN-Treiber rtw88 (`irl4you-wifi-rtw88`) | GPL-2.0 (mit Linux-syscall-note beim Kernel) | https://github.com/armbian/linux-rockchip, https://github.com/lwfinger/rtw88 |
-| u-boot-gpl-2.0.txt | U-Boot (Firmware-Stand der ROCK 5B+) | GPL-2.0-or-later | https://source.denx.de/u-boot/u-boot |
-| tf-a-license.rst | TF-A (BL31 im Firmware-Stand der ROCK 5B+) | BSD-3-Clause | https://github.com/ARM-software/arm-trusted-firmware |
+| u-boot-gpl-2.0.txt | U-Boot (Firmware-Stände der ROCK 5B+ und Orange Pi 5 Plus) | GPL-2.0-or-later | https://source.denx.de/u-boot/u-boot |
+| tf-a-license.rst | TF-A (BL31 in den Firmware-Ständen) | BSD-3-Clause | https://github.com/ARM-software/arm-trusted-firmware |
 | rkbin-LICENSE.txt | Rockchip-Binärteile (DDR-Initialisierung) | Lizenz von Rockchip (Nutzen, Kopieren und Weitergeben erlaubt) | https://github.com/rockchip-linux/rkbin |
 | moblin-LICENSE.txt | Moblin (Ablauf der DJI-Kopplung) | MIT | https://github.com/eerimoq/moblin |
 | feather-MIT.txt | Symbole der Oberfläche (angelehnt an Feather) | MIT | https://github.com/feathericons/feather |
