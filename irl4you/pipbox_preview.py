@@ -163,9 +163,8 @@ def gst_argv(codec, fps, width, cpus=None, fmt="mjpeg"):
     else:
         out = ["!", "mppjpegenc", "q-factor=60", "!", "multipartmux", f"boundary={BOUNDARY}", "!", "fdsink", "fd=1"]
     return pre + ["gst-launch-1.0", "-q", "fdsrc", "fd=0", "!", "tsdemux", "name=t",
-                  "t.", "!", f"video/x-{codec}", "!", "queue", "!", f"{codec}parse", "!", "mppvideodec",
-                  "!", "videorate", "drop-only=true", "!", f"video/x-raw,framerate={fps}/1",
-                  "!", "videoscale", "method=nearest-neighbour", "!", f"video/x-raw,width={width},height={height}"] + out + \
+                  "t.", "!", f"video/x-{codec}", "!", "queue", "!", f"{codec}parse", "!", "mppvideodec", f"width={width}", f"height={height}",
+                  "!", "videorate", "drop-only=true", "!", f"video/x-raw,framerate={fps}/1"] + out + \
                  ["t.", "!", "audio/x-opus", "!", "queue", "leaky=downstream", "!", "fakesink", "sync=false", "async=false"]
 
 
@@ -339,7 +338,7 @@ class Preview:
     def spawn(self, fps, width, fmt="mjpeg"):
         try:
             return subprocess.Popen(gst_argv(self.codec(), fps, width, little_cpus(self.big_cpus()), fmt), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                    stderr=subprocess.DEVNULL, env=dict(os.environ, GST_MPP_NO_RGA="1"), bufsize=0)
+                                    stderr=subprocess.DEVNULL, env=dict(os.environ), bufsize=0)
         except OSError as e:
             raise Unavailable("gst: %s" % e)
 
