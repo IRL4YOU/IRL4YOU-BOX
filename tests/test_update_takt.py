@@ -93,6 +93,9 @@ class TestUpdateTakt(unittest.TestCase):
         self.assertIn("bremst", str(cm.exception))
         self.assertRegex(str(cm.exception), r"In etwa 2[56] Minuten")
 
+    def test_abgelehnte_abfrage_ist_kein_dienstfehler(self):
+        self.assertIn("SuccessExitStatus=2", _text("irl4you-update-auto.service"))
+
     def test_prueft_nur(self):
         # Die Prüfung ruft "auto" auf; installiert wird nur mit auto_install in update.conf (Standard: aus)
         self.assertIn("ExecStart=/usr/local/sbin/irl4you-update auto", _text("irl4you-update-auto.service"))
