@@ -114,15 +114,18 @@ if ! cmp -s "$HERE/rtmps/irl4you-rtmps-cert.service" /etc/systemd/system/irl4you
     systemctl daemon-reload; systemctl enable irl4you-rtmps-cert.service >/dev/null 2>&1 || true
 fi
 
-# 10. Werkzeug zum Tauschen des Bootloader-FIT (nur bereitgestellt, nichts wird automatisch geschrieben): irl4you-bootloader status|apply|restore
+# 10. Werkzeug zum Tauschen der Firmware auf der SD-Karte (nur bereitgestellt, nichts wird automatisch geschrieben): irl4you-bootloader status|apply
 install -d /usr/share/irl4you/bootloader
-# Nur die ROCK 5B+ bekommt Firmware-Dateien (Ordner rock-5b-plus/armbian); andere Boards bekommen keine
+# Jedes Board bekommt nur seinen eigenen Firmware-Ordner (rock-5b-plus bzw. orange-pi-5-plus), nichts vom anderen Board
 case "$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || true)" in
     *"ROCK 5B+"*|*"ROCK 5B Plus"*)
-        rm -rf /usr/share/irl4you/bootloader/rock-5b-plus
+        rm -rf /usr/share/irl4you/bootloader/rock-5b-plus /usr/share/irl4you/bootloader/orange-pi-5-plus
         cp -R "$HERE/bootloader/rock-5b-plus" /usr/share/irl4you/bootloader/rock-5b-plus ;;
+    *"Orange Pi 5 Plus"*)
+        rm -rf /usr/share/irl4you/bootloader/rock-5b-plus /usr/share/irl4you/bootloader/orange-pi-5-plus
+        cp -R "$HERE/bootloader/orange-pi-5-plus" /usr/share/irl4you/bootloader/orange-pi-5-plus ;;
     *)
-        rm -rf /usr/share/irl4you/bootloader/rock-5b-plus ;;
+        rm -rf /usr/share/irl4you/bootloader/rock-5b-plus /usr/share/irl4you/bootloader/orange-pi-5-plus ;;
 esac
 rm -f /usr/share/irl4you/bootloader/fit-opi5plus-*.bin
 install -m 755 "$HERE/bootloader/irl4you-bootloader.sh" /usr/share/irl4you/bootloader/irl4you-bootloader.sh
