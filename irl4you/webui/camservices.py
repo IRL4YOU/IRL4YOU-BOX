@@ -337,6 +337,7 @@ class HdmiService:
     HOST, PORT = "127.0.0.1", 9102
     CAMERA_NAMES = ("HDMI", "HDMI-Eingang", "HDMI 2")
     USB_NAMES = ("USB-Kamera", "USB-Webcam", "USB 2")
+    TEST_NAMES = ("Testbild", "Testbild 2")
     ALLOWED = ("enabled", "bitrate", "fps", "audio", "source", "usb_format")
     TTL = 1.5
     DOWN = "Der HDMI-Dienst läuft nicht (Software-Update oder install.sh ausführen)"
@@ -404,8 +405,8 @@ class HdmiService:
         roles = {c["role"] for c in self.cams.cams}
         role = "main" if "main" not in roles else "pip" if "pip" not in roles else "extra"
         taken = {c["name"].casefold() for c in self.cams.cams}
-        names = self.USB_NAMES if source == "usb" else self.CAMERA_NAMES
-        name = next((n for n in names if n.casefold() not in taken), "USB-Kamera 2" if source == "usb" else "HDMI-Kamera")
+        names = self.TEST_NAMES if source == "test" else self.USB_NAMES if source == "usb" else self.CAMERA_NAMES
+        name = next((n for n in names if n.casefold() not in taken), "USB-Kamera 2" if source == "usb" else "Testbild 3" if source == "test" else "HDMI-Kamera")
         try:
             self.cams.add(name, HDMI_KEY, role)
         except ValueError:
