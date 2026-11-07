@@ -53,6 +53,9 @@
 
   .line-state { font-size: var(--text-sm); }
   .utdiag { margin-top: var(--space-2); }
+  /* Testknöpfe: gleiche Form wie die Reiter (rund, dünner Rand, Fläche der Karte) */
+  .btn[data-shape="pill"] { --_bg: var(--surface-1); --_bd: var(--border); border-radius: var(--radius-full); padding: 0 var(--space-4); }
+  .btn[data-shape="pill"]:hover { background: var(--surface-3); }
   .grow-input { flex: 1; min-width: 10rem; }
   .row .field { flex: 1; }
   .row.stackrow { align-items: stretch; flex-direction: column; gap: var(--space-3); }
