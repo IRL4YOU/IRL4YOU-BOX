@@ -10,6 +10,7 @@ from .actions import rotation_state
 from .auth import Auth
 from .cameras import label_bluetooth
 from .common import WEB_DIR, iface_ips, read
+from .netstate import uplink_states
 from .webfiles import static_file
 
 ICONS = {"/favicon.svg": ("favicon.svg", "image/svg+xml"), "/favicon.ico": ("favicon.ico", "image/x-icon"),
@@ -176,7 +177,13 @@ class GetRoutes:
         if path == "/api/network":
             return self.reply(200, self.netchoice.status())
         if path == "/api/srtla":
-            return self.reply(200, {**self.srtla.public(), "interfaces": iface_ips(), "conn_names": self.conn_labels()})
+            out = {**self.srtla.public(), "interfaces": iface_ips(), "conn_names": self.conn_labels()}
+            sel = (out.get("settings") or {}).get("uplinks") or []
+            out["hotspot_ifaces"] = sorted(self.hotspot_ifaces())
+            out["diag"] = self.uplinktest.diagnose(sel, uplink_states(sel), bool(self.send._active())) if self.uplinktest else {}
+            return self.reply(200, out)
+        if path == "/api/uplinktest":
+            return self.reply(200, self.uplinktest.status() if self.uplinktest else {"tests": {}, "busy": False, "health": None, "sending": False})
         if path == "/api/pipeline":
             st = self.pipeline.status(self.cams.listing(""))
             st["live"] = {"main": self.send.delay_live(), "pips": self.send.delay_live_pips()}

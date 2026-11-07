@@ -37,6 +37,11 @@ class PostRoutes:
                 self.auth.change_password(d.get("old"), d.get("new"), self.ip())
                 tok = self.auth.login(d.get("new"), self.ip(), d.get("remember") is True)
                 return self.reply(200, {"ok": True}, self.cookie(tok, REMEMBER_SECONDS if d.get("remember") is True else SESSION_SECONDS))
+            if path == "/api/uplinktest":
+                if not self.uplinktest:
+                    raise ValueError("Der Test ist nicht verfügbar")
+                ifs = d.get("ifaces") if isinstance(d.get("ifaces"), list) else ([d["iface"]] if d.get("iface") else [])
+                return self.reply(200, self.uplinktest.start(ifs[:8], allow_all=d.get("all") is True))
             if path == "/api/network":
                 self.netchoice.select(d.get("iface"))
                 return self.reply(200, {"ok": True})

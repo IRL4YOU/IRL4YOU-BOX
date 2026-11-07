@@ -33,6 +33,7 @@ from .pipeline import PipelineStore
 from .remote import Remote
 from .sampler import Sampler
 from .send import SendControl
+from .uplinktest import UplinkTests
 from .settings_transfer import SettingsTransfer
 from .stats import StatsServer, StatsShare
 from .system import AutoStart, BtDriver, Developer, LogBundle, LogMode, Power
@@ -66,6 +67,7 @@ def main():
     Handler.srtla = SrtlaStore(os.path.join(args.state, "srtla.json"))
     Handler.pipeline = PipelineStore(os.path.join(args.state, "pipeline.json"))
     Handler.send = SendControl(args.state, Handler.srtla, Handler.pipeline, Handler.cams, args.demo)
+    Handler.uplinktest = UplinkTests(args.demo, sending=lambda: Handler.send._active(), skip=lambda: Handler.hotspot_ifaces())
     Handler.preview = pipbox_preview.Client() if pipbox_preview and not args.demo else None
     Handler.swupdate = SwUpdate(args.state, args.demo, Handler.send)
     if not args.demo:
