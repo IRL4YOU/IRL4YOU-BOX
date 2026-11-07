@@ -316,6 +316,12 @@ class Updater:
         except urllib.error.HTTPError as e:
             if e.code == 304:
                 raise NotModified()
+            if e.code in (403, 429) and str(e.headers.get("X-RateLimit-Remaining", "")) == "0":
+                try:
+                    mins = max(1, (int(e.headers.get("X-RateLimit-Reset", "0")) - int(time.time())) // 60 + 1)
+                except (TypeError, ValueError):
+                    mins = 60
+                raise Refuse("GitHub bremst gerade: zu viele Abfragen aus diesem Netz (60 pro Stunde). In etwa %d Minuten geht es wieder." % min(mins, 60))
             if e.code in (401, 403):
                 raise Refuse("GitHub lehnt die Anfrage ab (%d). Schlüssel oder Anfragegrenze prüfen." % e.code)
             if e.code in (404, 422):
