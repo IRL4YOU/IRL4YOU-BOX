@@ -92,12 +92,11 @@ class TestFusszeileUndLinks(unittest.TestCase):
                     self.assertNotIn("irl4you_2604", t, os.path.join(root, f))
         self.assertIn("https://github.com/IRL4YOU/IRL4YOU-BOX/issues", _read(os.path.join(WEB, "neu", "views", "system.js")))
 
-    def test_leitungstest_bleibt_aus_solange_der_dienst_fehlt(self):
-        # die Oberflaeche ruft /api/uplinktest nur auf, wenn der Schalter an ist; der Server kennt die Route nicht
+    def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
-        self.assertIn("const CAN_TEST = false;", netz)
+        self.assertIn("const CAN_TEST = true;", netz)
         server = _read(os.path.join(IRL, "webui", "routes_get.py")) + _read(os.path.join(IRL, "webui", "routes_post.py"))
-        self.assertNotIn("/api/uplinktest", server)
+        self.assertEqual(server.count('"/api/uplinktest"'), 2)
 
 
 class TestLatenzRegler(unittest.TestCase):
