@@ -178,14 +178,20 @@ class TestMobcamProtokoll(unittest.TestCase):
         r = mr.Rtmp.__new__(mr.Rtmp)
         r.sock, r.lock, r.chunk_out = a, threading.Lock(), 4096
         payload = bytes(range(256)) * 40
+        teile = []
+
+        def lesen():
+            while True:
+                d = b.recv(65536)
+                if not d:
+                    break
+                teile.append(d)
+        t = threading.Thread(target=lesen, daemon=True)
+        t.start()
         r._send(6, 0x1000000, 9, 1, payload)
         a.close()
-        got = b""
-        while True:
-            d = b.recv(65536)
-            if not d:
-                break
-            got += d
+        t.join(5)
+        got = b"".join(teile)
         self.assertEqual(got[0], 6)
         self.assertEqual(got[1:4], b"\xff\xff\xff")
         self.assertEqual(int.from_bytes(got[4:7], "big"), len(payload))
@@ -234,6 +240,18 @@ class TestMobcamProtokoll(unittest.TestCase):
             mr.connect_phone(7790, os.path.join(d, "gibt-es-nicht"))
 
 
+def _senden(sock, nachrichten):
+    """Schickt die Nachrichten aus einem eigenen Thread (große Mengen würden sonst vor dem Lesen den Socket verstopfen) und schließt dann die Schreibseite."""
+    def lauf():
+        try:
+            for kind, payload in nachrichten:
+                sock.sendall(bytes([kind]) + struct.pack(">I", len(payload)) + payload)
+            sock.shutdown(socket.SHUT_WR)
+        except OSError:
+            pass
+    threading.Thread(target=lauf, daemon=True).start()
+
+
 class FakeRtmp:
     def __init__(self, *a):
         self.sent = []
@@ -252,16 +270,14 @@ class FakeRtmp:
 
 
 class TestMobcamSitzung(unittest.TestCase):
-    def _lauf(self, nachrichten, audio="mobcam"):
+    def _lauf(self, nachrichten, audio="mobcam", window_us=0, fehler=mr.MuxError):
         a, b = socket.socketpair()
-        for kind, payload in nachrichten:
-            b.sendall(bytes([kind]) + struct.pack(">I", len(payload)) + payload)
-        b.shutdown(socket.SHUT_WR)
-        args = types.SimpleNamespace(key="hdmi", rtmp_port=1935, rtmp_app="publish", audio=audio)
+        _senden(b, nachrichten)
+        args = types.SimpleNamespace(key="hdmi", rtmp_port=1935, rtmp_app="publish", audio=audio, window_us=window_us)
         s = mr.Session(a, args)
         fake = FakeRtmp()
         s.open = lambda: (setattr(s, "rtmp", fake), fake.send_video(0, mr.flv_video(s.vcfg[0], True, 0, s.vcfg[3])))
-        with self.assertRaises(mr.MuxError):
+        with self.assertRaises(fehler):
             s.run()
         a.close()
         b.close()
@@ -292,6 +308,54 @@ class TestMobcamSitzung(unittest.TestCase):
                            (mr.MSG_AUDIO_FRAME, struct.pack(">Q", 1000) + b"AAC")], audio="none")
         self.assertEqual([k for k, *_ in sent], ["video", "video"])
         self.assertEqual(sent[0][2][0], 0x17)                                              # H.264: Kennung 7
+
+
+class TestMobcamBitratenSperre(unittest.TestCase):
+    """Ein Strom über 12 Mbit/s wird abgelehnt, bevor er die Live-Kette erreicht (sie schafft je Strom nur etwa 13 Mbit/s)."""
+
+    def _strom(self, mbit, sekunden=3, fps=30):
+        vcfg = struct.pack(">BHHI", mr.CODEC_HEVC, 1920, 1080, 4) + b"hvcC"
+        gross = int(mbit * 1e6 / 8 / fps)
+        msgs = [(mr.MSG_VIDEO_CONFIG, vcfg)]
+        for i in range(sekunden * fps):
+            msgs.append((mr.MSG_VIDEO_FRAME, struct.pack(">QB", 1000000 + i * 1000000 // fps, 1 if i == 0 else 0) + bytes(gross)))
+        return msgs
+
+    def _lauf(self, msgs):
+        return TestMobcamSitzung._lauf(self, msgs, window_us=2000000, fehler=(mr.TooHigh, mr.MuxError))
+
+    def test_zu_hohe_bitrate_wird_abgelehnt_und_nichts_gesendet(self):
+        a, b = socket.socketpair()
+        _senden(b, self._strom(30))
+        s = mr.Session(a, types.SimpleNamespace(key="hdmi", rtmp_port=1935, rtmp_app="publish", audio="mobcam", window_us=2000000))
+        s.open = lambda: self.fail("die Kette darf den Strom nicht sehen")
+        with self.assertRaises(mr.TooHigh) as cm:
+            s.run()
+        self.assertGreater(cm.exception.args[0], mr.MAX_MBIT)
+        a.close()
+        b.close()
+
+    def test_bitrate_im_rahmen_geht_durch_und_alles_wird_in_reihenfolge_nachgereicht(self):
+        sent = self._lauf(self._strom(10))
+        self.assertEqual(sent[0][0], "video")                      # Kopf
+        self.assertEqual(sent[0][2][1], 0)
+        self.assertGreater(len([x for x in sent if x[0] == "video"]), 60)
+
+    def test_meldung_ist_im_dienst_und_im_hilfsprogramm_gleich(self):
+        hd = irl("hdmi_daemon")
+        self.assertEqual(hd.MOBCAM_TOO_HIGH, mr.TOO_HIGH)
+
+    def test_dienst_zeigt_die_meldung_ohne_neustart(self):
+        hd = irl("hdmi_daemon")
+        usb = tempfile.mkdtemp()
+        _write(os.path.join(usb, "9-1", "idVendor"), "05ac\n")
+        d = hd.Daemon(tempfile.mkdtemp(), device="/gibt/es/nicht", spawn=None, publishing=lambda k: True, sysusb=usb, typec=os.path.join(usb, "tc"))
+        d.cfg = dict(d.cfg, source="mobcam", enabled=True)
+        d.tail.append(hd.MOBCAM_TOO_HIGH)
+        d.started = d.clock() - 100
+        asyncio.run(d._watch_stream())
+        self.assertEqual((d.state, d.message), ("starting", hd.MOBCAM_TOO_HIGH))
+        self.assertIsNone(d.missing_since)
 
 
 class TestMobcamHinweise(unittest.TestCase):
