@@ -20,5 +20,5 @@ if [ -f install/system-install.sh ]; then
 fi
 
 systemctl daemon-reload
-systemctl enable --quiet irl4you-update.path irl4you-update-auto.timer || true
-systemctl start irl4you-update.path irl4you-update-auto.timer || true
+systemctl enable --quiet irl4you-update.path irl4you-update-cancel.path irl4you-update-auto.timer || true
+systemctl start irl4you-update.path irl4you-update-cancel.path irl4you-update-auto.timer || true
