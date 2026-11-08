@@ -404,6 +404,8 @@ class Updater:
         date = ((info.get("committer") or {}).get("date")) or ""
         return {"sha": sha, "id": sha[:12], "message": str(info.get("message") or "")[:20000], "date": date}
 
+    HISTORY = 50          # so viele Stände holt eine Prüfung (Liste „Alle Änderungen“)
+
     def commits(self, n=15):
         """Neueste Commits des Zweigs, neuester zuerst."""
         raw = self._json("/repos/%s/commits?sha=%s&per_page=%d" % (self.cfg.repo, urllib.parse.quote(self.cfg.branch), n), cache="commits")
@@ -802,7 +804,7 @@ class Updater:
     def check(self):
         cur = self.active_commit()
         self.status(state="checking", step="Frage GitHub nach neuen Versionen", message="")
-        commits = self.commits()
+        commits = self.commits(self.HISTORY)
         labels = self.versions_of(commits)
         tip, msg = self._newer_than_active(commits, labels[0])
         notes = []
