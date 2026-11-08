@@ -38,6 +38,7 @@ SYS_TYPEC = "/sys/class/typec"
 APPLE_VENDOR = "05ac"
 MOBCAM_HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobcam_rtmp.py")
 MOBCAM_WAIT = "Warte auf Moblin"
+MOBCAM_TOO_HIGH = "Die Bitrate in Moblin ist zu hoch. Bitte höchstens 10 Mbit/s einstellen."
 MOBCAM_PHONE_TEXT = "Kein iPhone angeschlossen (USB-Datenkabel, iPhone entsperren, „Vertrauen“ tippen)"
 DJI_VENDOR = "2ca3"
 POWER_WINDOW = 180.0
@@ -754,6 +755,10 @@ class Daemon:
         pub = await loop.run_in_executor(None, self._publishing, self.cfg["key"])
         self.published = pub
         age = now - self.started
+        if self.cfg.get("source") == "mobcam" and self.tail and MOBCAM_TOO_HIGH in self.tail[-1]:
+            self.started = now
+            self.state, self.message, self.missing_since = "starting", MOBCAM_TOO_HIGH, None
+            return
         if self.cfg.get("source") == "mobcam" and self.tail and MOBCAM_WAIT in self.tail[-1]:
             self.started = now
             self.state, self.message, self.missing_since = "starting", MOBCAM_WAIT + " (Stream-Adresse mobcam://localhost:7790)", None

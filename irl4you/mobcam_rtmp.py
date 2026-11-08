@@ -23,6 +23,16 @@ USBMUXD = "/var/run/usbmuxd"
 PORT = 7790
 WAIT = "Warte auf Moblin"
 STALL = 8.0
+STATS = bool(os.environ.get("IRL4YOU_MOBCAM_STATS"))
+# Schutz der Live-Kette: Ihr RTMP-Eingang kommt mit mehr als etwa 13 Mbit/s je Strom nicht mehr mit (Verzug, Abstürze). Ein Strom über MAX_MBIT wird abgelehnt,
+# bevor er die Kette erreicht; gemessen über die ersten WINDOW_US Mikrosekunden Bildzeit und danach fortlaufend.
+MAX_MBIT = 12.0
+WINDOW_US = 2000000
+TOO_HIGH = "Die Bitrate in Moblin ist zu hoch. Bitte höchstens 10 Mbit/s einstellen."
+
+
+class TooHigh(Exception):
+    pass
 CHUNK = 4096
 MSG_HOST_HELLO, MSG_DEVICE_HELLO, MSG_VIDEO_CONFIG, MSG_VIDEO_FRAME, MSG_AUDIO_CONFIG, MSG_AUDIO_FRAME = 1, 2, 3, 4, 5, 6
 CODEC_H264, CODEC_HEVC = 0, 1
@@ -368,6 +378,26 @@ class Session:
         self.counts = {"v": 0, "a": 0}
         self.next_try = 0.0
         self.failed = 0
+        self.window_us = getattr(args, "window_us", WINDOW_US)
+        self.max_mbit = getattr(args, "max_mbit", MAX_MBIT)
+        self.probing = self.window_us > 0
+        self.pending = []
+        self.win = None
+        self.st = {"t": time.monotonic(), "last": 0.0, "gap": 0.0, "n": 0, "bytes": 0, "maxsz": 0}
+
+    def stats(self, size):
+        """Nur zur Fehlersuche (IRL4YOU_MOBCAM_STATS=1): Bilder pro Sekunde, größte Lücke zwischen zwei Bildern, Datenrate."""
+        now = time.monotonic()
+        st = self.st
+        if st["last"]:
+            st["gap"] = max(st["gap"], now - st["last"])
+        st["last"] = now
+        st["n"] += 1
+        st["bytes"] += size
+        st["maxsz"] = max(st["maxsz"], size)
+        if now - st["t"] >= 5:
+            say("info: %.1f Bilder/s, groesste Luecke %d ms, %.1f Mbit/s, groesstes Bild %d KB" % (st["n"] / (now - st["t"]), st["gap"] * 1000, st["bytes"] * 8 / 1e6 / (now - st["t"]), st["maxsz"] // 1024))
+            st.update(t=now, gap=0.0, n=0, bytes=0, maxsz=0)
 
     def ts(self, pts_us, kind):
         if self.base is None:
@@ -384,56 +414,90 @@ class Session:
             self.rtmp.send_data(0, metadata(w, h, codec, self.args.audio == "mobcam"))
             self.rtmp.send_video(0, flv_video(codec, True, 0, rec))
 
+    def check_rate(self, size, pts):
+        """Misst die Datenrate des Bildes in Fenstern von window_us; wirft TooHigh, wenn sie über max_mbit liegt. True, wenn ein Fenster in Ordnung war."""
+        if not self.window_us:
+            return False
+        if self.win is None:
+            self.win = [pts, 0]
+        self.win[1] += size
+        span = pts - self.win[0]
+        if span < self.window_us:
+            return False
+        mbit = self.win[1] * 8 / (span / 1e6) / 1e6
+        self.win = [pts, 0]
+        if mbit > self.max_mbit:
+            raise TooHigh(mbit)
+        return True
+
     def run(self):
         self.sock.sendall(bytes([MSG_HOST_HELLO]) + struct.pack(">I", 1) + bytes([1]))
         while True:
             kind, p = read_message(self.sock)
-            if kind == MSG_DEVICE_HELLO:
+            ok = kind == MSG_VIDEO_FRAME and len(p) >= 9 and self.check_rate(len(p), struct.unpack(">Q", p[:8])[0])
+            if self.probing:
+                self.pending.append((kind, p))
+                if ok:
+                    self.probing = False
+                    for k, q in self.pending:
+                        self.handle(k, q)
+                    self.pending = []
+                continue
+            self.handle(kind, p)
+
+    def handle(self, kind, p):
+        if kind == MSG_DEVICE_HELLO:
+            try:
+                import json
+                j = json.loads(p[5:5 + struct.unpack(">I", p[1:5])[0]])
+                say("Moblin %s auf %s verbunden" % (j.get("version", "?"), j.get("name", "iPhone")))
+            except (ValueError, struct.error):
+                say("Moblin verbunden")
+        elif kind == MSG_VIDEO_CONFIG:
+            self.vcfg = parse_video_config(p)
+            codec, w, h, _ = self.vcfg
+            say("Bild: %dx%d %s" % (w, h, "HEVC" if codec == CODEC_HEVC else "H.264"))
+            if self.rtmp is not None:               # neue Einstellung während des Betriebs: Kopf erneut senden
+                self.rtmp.send_video(self.last_ts["v"], flv_video(codec, True, 0, self.vcfg[3]))
+            self.have_key = False
+        elif kind == MSG_AUDIO_CONFIG:
+            self.acfg = parse_audio_config(p)
+            self.audio_sent = False
+        elif kind == MSG_VIDEO_FRAME and self.vcfg:
+            pts, flags = struct.unpack(">QB", p[:9])
+            key = bool(flags & 1)
+            if not self.have_key and not key:
+                return
+            if self.rtmp is None:
+                # SRS gibt einen eben beendeten Sender erst nach einigen Sekunden frei: Bilder verwerfen und es erneut versuchen, Moblin bleibt verbunden
+                if time.monotonic() < self.next_try:
+                    return
                 try:
-                    import json
-                    j = json.loads(p[5:5 + struct.unpack(">I", p[1:5])[0]])
-                    say("Moblin %s auf %s verbunden" % (j.get("version", "?"), j.get("name", "iPhone")))
-                except (ValueError, struct.error):
-                    say("Moblin verbunden")
-            elif kind == MSG_VIDEO_CONFIG:
-                self.vcfg = parse_video_config(p)
-                codec, w, h, _ = self.vcfg
-                say("Bild: %dx%d %s" % (w, h, "HEVC" if codec == CODEC_HEVC else "H.264"))
-                if self.rtmp is not None:               # neue Einstellung während des Betriebs: Kopf erneut senden
-                    self.rtmp.send_video(self.last_ts["v"], flv_video(codec, True, 0, self.vcfg[3]))
-                self.have_key = False
-            elif kind == MSG_AUDIO_CONFIG:
-                self.acfg = parse_audio_config(p)
-                self.audio_sent = False
-            elif kind == MSG_VIDEO_FRAME and self.vcfg:
-                pts, flags = struct.unpack(">QB", p[:9])
-                key = bool(flags & 1)
-                if not self.have_key and not key:
-                    continue
-                if self.rtmp is None:
-                    # SRS gibt einen eben beendeten Sender erst nach einigen Sekunden frei: Bilder verwerfen und es erneut versuchen, Moblin bleibt verbunden
-                    if time.monotonic() < self.next_try:
-                        continue
-                    try:
-                        self.open()
-                    except (RtmpError, OSError) as e:
-                        self.failed += 1
-                        self.next_try = time.monotonic() + 1.0
-                        self.rtmp = None
-                        if self.failed > 15:
-                            raise
-                        continue
-                    self.failed = 0
-                self.have_key = True
-                self.rtmp.send_video(self.ts(pts, "v"), flv_video(self.vcfg[0], key, 1, p[9:]))
-                self.counts["v"] += 1
-            elif kind == MSG_AUDIO_FRAME and self.acfg and self.args.audio == "mobcam" and self.rtmp is not None:
-                pts = struct.unpack(">Q", p[:8])[0]
-                if not self.audio_sent:
-                    self.rtmp.send_audio(self.last_ts["a"], flv_audio(0, self.acfg[3]))
-                    self.audio_sent = True
-                self.rtmp.send_audio(self.ts(pts, "a"), flv_audio(1, p[8:]))
-                self.counts["a"] += 1
+                    self.open()
+                except (RtmpError, OSError) as e:
+                    self.failed += 1
+                    self.next_try = time.monotonic() + 1.0
+                    self.rtmp = None
+                    if self.failed > 15:
+                        raise
+                    return
+                self.failed = 0
+            self.have_key = True
+            if STATS and not self.counts["v"]:
+                say("info: erstes Bild: Zeit %d us" % pts)
+            self.rtmp.send_video(self.ts(pts, "v"), flv_video(self.vcfg[0], key, 1, p[9:]))
+            self.counts["v"] += 1
+            if STATS:
+                self.stats(len(p))
+        elif kind == MSG_AUDIO_FRAME and self.acfg and self.args.audio == "mobcam" and self.rtmp is not None:
+            pts = struct.unpack(">Q", p[:8])[0]
+            if STATS and not self.counts["a"]:
+                say("info: erster Ton: Zeit %d ms nach dem ersten Bild (Basis %d)" % ((pts - self.base) // 1000 if self.base else -1, self.base or 0))
+            if not self.audio_sent:
+                self.rtmp.send_audio(self.last_ts["a"], flv_audio(0, self.acfg[3]))
+                self.audio_sent = True
+            self.rtmp.send_audio(self.ts(pts, "a"), flv_audio(1, p[8:]))
+            self.counts["a"] += 1
 
     def close(self):
         if self.rtmp:
@@ -469,14 +533,20 @@ def main():
             continue
         announced = None
         session = Session(sock, args)
+        rejected = False
         try:
             session.run()
+        except TooHigh as e:
+            rejected = True
+            say("info: gemessen %.1f Mbit/s, erlaubt bis %.0f Mbit/s" % (e.args[0], MAX_MBIT))
+            say(TOO_HIGH)
         except (MuxError, OSError, RtmpError, struct.error) as e:
             say("Verbindung zu Moblin beendet: %s" % (e if not isinstance(e, socket.timeout) else "Moblin sendet nicht mehr"))
         finally:
             session.close()
-        say(WAIT)
-        time.sleep(1)
+        if not rejected:
+            say(WAIT)
+        time.sleep(3 if rejected else 1)
 
 
 if __name__ == "__main__":
