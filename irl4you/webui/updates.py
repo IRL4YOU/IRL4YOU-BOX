@@ -1,5 +1,6 @@
 """IRL4YOU BOX Oberfläche: Software-Update von IRL4YOU (Update-Helfer) und System-Updates (apt)."""
 
+import fcntl
 import json
 import os
 import re
@@ -15,6 +16,10 @@ class SwUpdate:
     Repo und Zugang stehen in /etc/irl4you/update.conf (die Oberfläche kann sie nicht ändern). Anfrage: Stichwort in swupdate-request
     (check, install, rollback, switch + Commit in Zeile 2), Antwort: /run/pipbox-swupdate/status.json."""
     STATUS = "/run/pipbox-swupdate/status.json"
+    LOCK = "/var/lib/irl4you/update.lock"            # der Installer hält sie, solange er lebt
+    CANCEL = "/var/lib/pipbox/swupdate-cancel"
+    STALL_S = 300                                     # so lange ohne Lebenszeichen, bis „Abbrechen“ frei wird
+    CANCEL_STEPS = ("Frage GitHub nach dem Stand", "Lade neue Version", "Prüfe und entpacke das Archiv")
     RELEASES = "/opt/irl4you/releases"
     CURRENT = "/opt/irl4you/current"
     PREVIOUS = "/var/lib/irl4you/previous"
@@ -72,6 +77,23 @@ class SwUpdate:
         fd = os.open(self.req, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
             f.write(text)
+
+    def lock_alive(self):
+        """Lebt der Installer noch? Er hält die Sperre; ohne sie ist ein Stand „installiert gerade“ übrig geblieben (Absturz, Stromausfall)."""
+        try:
+            fd = os.open(self.LOCK, os.O_RDONLY)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return True                                   # nicht prüfbar: lieber nicht freigeben
+        try:
+            fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            return False
+        except OSError:
+            return True
+        finally:
+            os.close(fd)
 
     def check(self, force=False, fresh=False):
         """Der Helfer prüft selbst (Timer alle 2 Stunden). Hier eine Prüfung anstoßen: auf Wunsch (force) oder wenn noch keine da ist bzw. die letzte älter als STALE ist
@@ -206,6 +228,8 @@ class SwUpdate:
         state = st.get("state") if st.get("state") in ("installing", "done", "rolledback", "failed", "refused") else "idle"
         if state != "installing" and (not st.get("time") or time.time() - st["time"] > 6 * 3600):
             state = "idle"
+        if state == "installing" and not self.demo and not self.lock_alive():
+            state = "failed"                                  # der Installer lebt nicht mehr: nicht ewig „läuft“ anzeigen
         step = st.get("step", "")
         return {"state": state, "step": step if state == "installing" and isinstance(step, str) else "", "progress": self._pct(st)}
 
@@ -230,6 +254,18 @@ class SwUpdate:
             out["state"], out["message"] = "idle", ""
         if out["state"] == "idle" and chk.get("message") and chk.get("available") is False:
             out["message"] = str(chk.get("message"))[:300]
+        if out["state"] == "installing" and not self.demo:
+            if not self.lock_alive():                         # übrig geblieben (Stromausfall, Absturz): freigeben und es sagen
+                out["state"], out["step"], out["interrupted"] = "failed", "", True
+                out["message"] = "Das Update wurde unterbrochen (zum Beispiel durch einen Neustart der Box). Die Box läuft auf der bisherigen Version, du kannst es erneut starten."
+            elif str(out["step"]).startswith(self.CANCEL_STEPS):
+                try:
+                    still = time.time() - float(st.get("time") or 0)
+                except (TypeError, ValueError):
+                    still = 0
+                out["cancel_in"] = 0 if still >= self.STALL_S else int(-(-(self.STALL_S - still) // 60) * 60)       # Sekunden bis „Abbrechen“ frei wird, auf Minuten gerundet
+            else:
+                out["cancel_in"] = None                       # Umschalten und Neustart der Dienste: nie abbrechen
         if not self.demo and not os.path.exists(self.HELPER):
             out["error"] = "Der Update-Helfer ist auf dieser Box nicht installiert."
         prev = self.previous_id()
@@ -240,7 +276,26 @@ class SwUpdate:
         out["helper_installed"] = self.demo or os.path.exists(self.HELPER)
         return out
 
+    def cancel(self, confirm):
+        """Hängendes Update abbrechen: nur in der Vorbereitung und erst, wenn es 5 Minuten stillsteht. Der Helfer-Dienst für den Abbruch beendet es."""
+        if confirm is not True:
+            raise ValueError("Bestätigung fehlt")
+        st = self.status()
+        if st["state"] != "installing":
+            raise ValueError("Es läuft kein Update")
+        wait = st.get("cancel_in")
+        if wait is None:
+            raise ValueError("In diesem Schritt kann nicht abgebrochen werden (das Update schaltet gerade um)")
+        if wait > 0:
+            raise ValueError("Abbrechen geht erst, wenn das Update 5 Minuten lang nichts mehr getan hat")
+        if self.demo:
+            self.fake_t0 = 0
+            return
+        os.close(os.open(self.CANCEL, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600))
+
     def request(self, action, confirm, version=None, older=False):
+        if action == "cancel":
+            return self.cancel(confirm)
         if action not in ("install", "rollback", "switch"):
             raise ValueError("Unbekannte Aktion")
         if confirm is not True:

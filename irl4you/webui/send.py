@@ -1,5 +1,6 @@
 """IRL4YOU BOX Oberfläche: Steuerung der Sendung (Start, Stopp, Umschalten im Betrieb)."""
 
+import fcntl
 import json
 import os
 import subprocess
@@ -15,6 +16,7 @@ from .pipeline_plugins import PENDING_LABELS, SWAP_SELECT, SWAP_STATE, VIEW_FILE
 class SendControl:
     STATUS = "/run/pipbox-send/status.json"
     UPDATE_STATUS = "/run/pipbox-swupdate/status.json"
+    UPDATE_LOCK = "/var/lib/irl4you/update.lock"
     UPDATE_MAX_AGE = 30 * 60          # ein "installing" ohne Lebenszeichen seit so langer Zeit gilt als übrig geblieben (Absturz), nicht als laufendes Update
     SWAP_WAIT = 2.0
 
@@ -93,9 +95,31 @@ class SendControl:
         try:
             with open(self.UPDATE_STATUS) as f:
                 d = json.load(f)
-            return d.get("state") == "installing" and time.time() - float(d.get("time", 0)) < self.UPDATE_MAX_AGE
+            if d.get("state") != "installing":
+                return False
+            alive = self._lock_alive()
+            if alive is not None:                              # der Installer hält die Sperre, solange er lebt: übrig gebliebenes „installiert gerade“ blockiert nicht
+                return alive
+            return time.time() - float(d.get("time", 0)) < self.UPDATE_MAX_AGE
         except (OSError, ValueError, TypeError, AttributeError):
             return False
+
+    def _lock_alive(self):
+        """True: der Installer lebt, False: nicht, None: nicht prüfbar."""
+        try:
+            fd = os.open(self.UPDATE_LOCK, os.O_RDONLY)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return None
+        try:
+            fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            return False
+        except OSError:
+            return True
+        finally:
+            os.close(fd)
 
     def reasons(self):
         r = []
