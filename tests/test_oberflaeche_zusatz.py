@@ -140,7 +140,7 @@ class TestFusszeileUndLinks(unittest.TestCase):
     def test_reiter_box_reihenfolge(self):
         # 1. Box aus-/neu starten, 2. Passwort ändern, 3. Aussehen; die Karte zeichnet sich nur bei Änderung neu
         sysjs = _read(os.path.join(WEB, "neu", "views", "system.js"))
-        self.assertIn("boxBox.append(powSlot, pwSlot, look);", sysjs)
+        self.assertIn("boxBox.append(powSlot, pwSlot, look, h('div', { id: 'sy-box-menu' }));", sysjs)
         self.assertIn("powSlot.replaceChildren(card({ title: 'Box ausschalten und abmelden'", sysjs)
         self.assertIn("if (sgP === powSig) return;", sysjs)
         self.assertNotIn("boxBox.replaceChildren(", sysjs)
@@ -238,6 +238,27 @@ class TestFusszeileUndLinks(unittest.TestCase):
                 self.assertIn(k, ex, (f, k))
             self.assertTrue([k for k in ex if hint_neu in k], f)
             self.assertFalse([k for k in ex if "„Live beenden“" in k], f)
+
+    def test_menue_und_karten_anpassen(self):
+        # System > Box: Reihenfolge und Anzeige der Menüpunkte, Karten ausblenden; Live und System bleiben immer im Menü
+        index = _read(os.path.join(WEB, "neu", "index.html"))
+        self.assertIn('<script defer src="/neu/anpassen.js"></script>', index)
+        self.assertLess(index.index("views/system.js"), index.index("anpassen.js"))
+        sysjs = _read(os.path.join(WEB, "neu", "views", "system.js"))
+        self.assertIn("boxBox.append(powSlot, pwSlot, look, h('div', { id: 'sy-box-menu' }));", sysjs)
+        a = _read(os.path.join(WEB, "neu", "anpassen.js"))
+        self.assertIn("const KEY = 'pb_neu_menu', FIX = ['live', 'system'];", a)
+        self.assertIn("const NEVER = ['Aussehen', 'Menü und Karten anpassen'];", a)
+        self.assertIn("[data-user-hidden] { display: none !important; }", a)
+        self.assertIn("title: 'Menü und Karten anpassen'", a)
+        import glob
+        import json
+        for f in sorted(glob.glob(os.path.join(WEB, "i18n", "*.json"))):
+            if f.endswith("languages.json"):
+                continue
+            ex = json.loads(_read(f))["exact"]
+            for k in ("Menü und Karten anpassen", "Karten ausblenden", "Alles zurücksetzen", "Immer sichtbar", "Nach oben", "Nach unten", "Anordnen"):
+                self.assertIn(k, ex, (f, k))
 
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
