@@ -14,8 +14,8 @@
     /* =================================================================
        Updates: Software (IRL4YOU BOX)
        ================================================================= */
-    const swBox = h('div'), histCard = h('div');
-    let swChecking = 0, swPending = 0, swSaw = false, swFirst = null, swSig = '', swVersions = [], swCur = '', verInput = input({ placeholder: 'Version wählen oder eintragen, z. B. 0.9.0', maxlength: 24, list: 'sw-vers', autocomplete: 'off' }), verInfo = h('p', { class: 'field__hint' }), dl = h('datalist', { id: 'sw-vers' }), swMsg = note(), swHist = null, histSecs = null, histQ = input({ type: 'search', placeholder: 'Suchen, z. B. Vorschau, Chat, Fußleiste', maxlength: 60 });
+    const swBox = h('div');
+    let swChecking = 0, swPending = 0, swSaw = false, swFirst = null, swSig = '', swVersions = [], swCur = '', verInput = input({ placeholder: 'Version wählen oder eintragen, z. B. 0.9.0', maxlength: 24, list: 'sw-vers', autocomplete: 'off' }), verInfo = h('p', { class: 'field__hint' }), dl = h('datalist', { id: 'sw-vers' }), swMsg = note(), swHist = null, histSecs = null, histQ = input({ type: 'search', placeholder: 'Suchen …', maxlength: 60, 'aria-label': 'Änderungen durchsuchen', style: 'height:2rem;padding:0 var(--space-2) 0 2rem;font-size:var(--text-sm)' });
     const swPoll = poll('swupdate', '/api/swupdate', 8000, () => App.view === 'system' || swPending);
     const SW_TERMINAL = ['failed', 'refused', 'rolledback']; let swNewer = false, sysAvail = false; const navDot = () => { const nd = document.getElementById('nd-system'); nd.hidden = !(swNewer || sysAvail); nd.dataset.tone = ''; };
     const swBegin = text => { swPending = Date.now(); swSaw = false; window.pbUpdating = swPending; swMsg.set(text); swSig = ''; renderSw(); };
@@ -66,7 +66,7 @@
           btn('Update installieren', { size: 'sm', variant: d.newer ? 'primary' : null, disabled: busy || !d.newer || d.sending || !d.helper_installed, onclick: async () => { if (await ask({ title: 'Software-Update installieren?', text: '• Es darf KEINE Übertragung laufen.\n• Die Oberfläche startet dabei kurz neu (etwa eine halbe Minute).\n• Kameras und Einstellungen bleiben erhalten; der Kamera-Dienst startet nur neu, wenn sich seine Dateien ändern.\n• Die jetzige Version wird gesichert, du kannst zurückgehen.', ok: 'Installieren' })) swAct({ action: 'install', confirm: true }, 'Update wird gestartet …'); } }),
           d.backup_version && !busy ? btn(`Zurück zu Version ${d.backup_version}`, { size: 'sm', onclick: async () => { if (await ask({ title: 'Zur vorherigen Version zurückgehen?', text: 'Die Oberfläche startet dabei kurz neu. Es darf nicht gesendet werden.', ok: 'Zurückgehen' })) swAct({ action: 'rollback', confirm: true }, 'Wird zurückgestellt …'); } }) : null),
         h('div', { class: 'stack', style: '--gap:var(--space-2)' }, h('label', { class: 'field__label', text: 'Auf eine bestimmte Version wechseln (auch ältere)' }), h('div', { class: 'cluster', style: 'flex-wrap:nowrap' }, h('div', { class: 'grow' }, verInput), dl,
-          btn('Wechseln', { disabled: busy || d.sending || !d.helper_installed, onclick: async () => { const v = x(); if (!v || v.current) { showInfo(); return; } const older = v.relation === 'älter'; if (await ask({ title: `Auf Version ${v.version} wechseln?`, text: (older ? `ACHTUNG: Das ist eine ÄLTERE Version als die installierte (${swCur}). Neuere Funktionen und Korrekturen fehlen dann.\n\n` : '') + '• Es darf KEINE Übertragung laufen.\n• Die Oberfläche startet dabei kurz neu.\n• Die jetzige Version wird vorher gesichert, du kannst wieder zurück.', ok: 'Wechseln', danger: older })) swAct({ action: 'switch', version: v.version, older, confirm: true }, 'Wechsel wird gestartet …'); } })), verInfo)] }));
+          btn('Wechseln', { disabled: busy || d.sending || !d.helper_installed, onclick: async () => { const v = x(); if (!v || v.current) { showInfo(); return; } const older = v.relation === 'älter'; if (await ask({ title: `Auf Version ${v.version} wechseln?`, text: (older ? `ACHTUNG: Das ist eine ÄLTERE Version als die installierte (${swCur}). Neuere Funktionen und Korrekturen fehlen dann.\n\n` : '') + '• Es darf KEINE Übertragung laufen.\n• Die Oberfläche startet dabei kurz neu.\n• Die jetzige Version wird vorher gesichert, du kannst wieder zurück.', ok: 'Wechseln', danger: older })) swAct({ action: 'switch', version: v.version, older, confirm: true }, 'Wechsel wird gestartet …'); } })), verInfo), hist] }));      // "Alle Änderungen" klappt unten in derselben Karte auf
     }
     /* Alle Änderungen (Verlauf mit Suche) */
     const histRes = h('div'), histCount = h('p', { class: 'field__hint' });
@@ -74,15 +74,18 @@
     function renderHist() {
       if (!histSecs) return; const toks = histQ.value.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6); let out = '', hits = 0, vers = 0;
       for (const s of histSecs) { const hl = s.head.toLowerCase(); const pick = toks.length ? s.items.filter(it => { const t = hl + ' ' + it.join(' ').toLowerCase(); return toks.every(w => t.includes(w)); }) : s.items; if (toks.length && !pick.length) continue; vers++; hits += pick.length; out += s.head + '\n' + pick.map(it => it.join('\n')).join('\n') + '\n\n'; }
-      histRes.replaceChildren(md(out)); histCount.textContent = toks.length ? (hits ? `${hits} Treffer in ${vers} Versionen` : 'Keine Treffer.') : `${histSecs.length} Versionen. Zum Suchen ein Stichwort eintippen.`;
+      histRes.replaceChildren(md(out)); histCount.textContent = toks.length ? (hits ? `${hits} Treffer in ${vers} Versionen` : 'Keine Treffer.') : `${histSecs.length} Versionen`;
     }
     histQ.addEventListener('input', renderHist);
     async function loadHist() { histCount.textContent = 'Wird geladen …'; try { const d = await api('GET', '/api/swupdate/history'); if (!d || !d.text) throw new Error('leer'); histSecs = parseHist(d.text); renderHist(); } catch (e) { histCount.textContent = 'Der Verlauf konnte nicht geladen werden.'; } }
-    const hist = disclosure('Alle Änderungen', field({ label: 'Suchen', control: histQ }), histCount, histRes); hist.addEventListener('toggle', () => { if (hist.open && !histSecs) loadHist(); });
-    histCard.append(card({ title: 'Änderungen', body: hist }));
+    const histLupe = ico('search', 'sm'); histLupe.style.cssText = 'position:absolute;left:var(--space-2);top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text-3)';
+    const histBody = h('div', { class: 'stack', style: '--gap:var(--space-3)', hidden: true }, h('div', { style: 'position:relative;max-width:14rem' }, histLupe, histQ), histCount, histRes);
+    const histBtn = btn('Alle Änderungen', { size: 'sm', ico: 'down', onclick: () => { const auf = histBody.hidden; histBody.hidden = !auf; histBtn.setAttribute('aria-expanded', String(auf)); histBtn.querySelector('svg').style.transform = auf ? 'rotate(180deg)' : ''; if (auf && !histSecs) loadHist(); } });
+    histBtn.setAttribute('aria-expanded', 'false');
+    const hist = h('div', { class: 'stack', style: '--gap:var(--space-3)' }, h('div', { class: 'cluster' }, histBtn), histBody);       // Knopf mit Rahmen wie "Nach Updates suchen"; die Liste klappt darunter auf
     App.on('swupdate', renderSw);
 
-    T.add('sy-update', 'Updates', h('div', { class: 'stack', style: '--gap:var(--space-5)' }, swBox, histCard));
+    T.add('sy-update', 'Updates', h('div', { class: 'stack', style: '--gap:var(--space-5)' }, swBox));
     const uf = document.createElement('div'); uf.hidden = true;
 
     /* =================================================================
