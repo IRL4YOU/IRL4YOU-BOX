@@ -358,6 +358,40 @@ class TestMobcamBitratenSperre(unittest.TestCase):
         self.assertIsNone(d.missing_since)
 
 
+class TestMobcamMeldungAufLive(unittest.TestCase):
+    """Die Bitrate-Meldung erscheint auch als Warnung auf der Live-Seite (Karte "Meldungen"), schon nach wenigen Sekunden."""
+
+    def test_warnung_nach_drei_sekunden(self):
+        sys.path.insert(0, os.path.join(ROOT, "irl4you"))
+        from webui import usbwatch
+        hd = irl("hdmi_daemon")
+        t = [1000.0]
+        w = usbwatch.OutageWatch(clock=lambda: t[0])
+        hdmi = {"service": True, "available": True, "state": "starting", "message": hd.MOBCAM_TOO_HIGH, "settings": {"enabled": True, "source": "mobcam"},
+                "signal": {}, "signal_known": True}
+        self.assertEqual(w.alerts([], hdmi), [])
+        t[0] += 2
+        self.assertEqual(w.alerts([], hdmi), [])
+        t[0] += 2
+        a = w.alerts([], hdmi)
+        self.assertEqual(len(a), 1)
+        self.assertEqual((a[0]["kind"], a[0]["src"], a[0].get("rate")), ("hdmi", "mobcam", True))
+        w.dismiss("hdmi", a[0]["t"]) if hasattr(w, "dismiss") else None
+        hdmi = dict(hdmi, message="")
+        self.assertEqual(w.alerts([], hdmi), [])
+
+    def test_text_und_platz_in_der_oberflaeche(self):
+        with open(os.path.join(ROOT, "irl4you", "web", "neu", "views", "live.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("a.kind === 'hdmi' && a.rate", js)
+        self.assertIn("{ title: '', text: 'Die Bitrate der Mobcam ist zu hoch. Bitte in Moblin höchstens 10 Mbit/s einstellen.'", js)     # ohne Überschrift
+        self.assertIn("Bitte in Moblin höchstens 10 Mbit/s einstellen.', dismiss: false }", js)             # kein \"Verstanden\": die Warnung geht von selbst weg
+        self.assertIn("sec.append(alerts, pageHead('Live'", js)                      # Meldungen ganz oben, über der Überschrift
+        self.assertNotIn("['meldungen', 'Meldungen'", js)
+        self.assertIn("alerts.hidden = !alerts.children.length;", js)
+        self.assertIn("pending.hidden = !pending.children.length;", js)                # leerer Platzhalter unter "Du bist live" erzeugt keinen Abstand
+
+
 class TestMobcamHinweise(unittest.TestCase):
     def _text(self, *teile):
         with open(os.path.join(ROOT, *teile), encoding="utf-8") as f:
