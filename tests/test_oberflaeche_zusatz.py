@@ -234,7 +234,7 @@ class TestFusszeileUndLinks(unittest.TestCase):
             if f.endswith("languages.json"):
                 continue
             ex = json.loads(_read(f))["exact"]
-            for k in ("Ansicht", "Handy", "kommt gleich", "Einstellungen durchsuchen (Strg K)", "Passwort ändern", "Stop"):
+            for k in ("Ansicht", "Handy", "kommt gleich", "Einstellungen durchsuchen (Strg K)", "Passwort ändern", "Stop", "Hell oder Dunkel"):
                 self.assertIn(k, ex, (f, k))
             self.assertTrue([k for k in ex if hint_neu in k], f)
             self.assertFalse([k for k in ex if "„Live beenden“" in k], f)
@@ -295,6 +295,15 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertNotIn("App.on('srtla', () => { sig = ''", wlan)
         kam = _read(os.path.join(WEB, "neu", "views", "kameras.js"))
         self.assertIn("if (subP.textContent !== subT) subP.textContent = subT;", kam)
+
+    def test_symbolknoepfe_haben_hinweis_beim_darueberfahren(self):
+        # Knöpfe nur mit Symbol brauchen neben der Beschriftung für Bildschirmleser auch einen sichtbaren Hinweis (title)
+        import re
+        index = _read(os.path.join(WEB, "neu", "index.html"))
+        for m in re.finditer(r"<button[^>]*>", index):
+            t = m.group(0)
+            if "aria-label" in t:
+                self.assertIn("title=", t, t[:120])
 
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
