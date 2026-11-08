@@ -205,6 +205,9 @@
   .hsig[data-tone="ok"] svg { color: var(--ok); } .hsig[data-tone="warn"] svg { color: var(--warn); } .hsig[data-tone="danger"] svg { color: var(--danger); }
   .hsig__v { font-weight: var(--weight-bold); color: var(--text-1); font-variant-numeric: tabular-nums; font-size: var(--text-sm); }
   .hsig.stale { opacity: .5; }
+  .sig-slot .hsig { display: flex; align-items: stretch; width: 100%; margin-top: var(--space-1); }
+  .sig-slot .hsig svg { flex: 1; min-width: 0; width: auto; height: 2.25rem; }
+  .sig-slot .hsig__scale { height: 2.25rem; }
   .hdots { display: inline-flex; gap: 0.375rem; }
   .hdot { width: 0.75rem; height: 0.75rem; border-radius: 50%; background: var(--text-3); }
   .hdot[data-tone="ok"] { background: var(--ok); } .hdot[data-tone="warn"] { background: var(--warn); } .hdot[data-tone="danger"] { background: var(--danger); }

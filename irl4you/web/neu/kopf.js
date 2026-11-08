@@ -4,6 +4,19 @@
   const { h, $, App, fmt } = Neu;
   const box = $('#hb-meters'), sig = $('#hb-sig'), dots = $('#hb-dots'), line = $('#hb-line'), val = $('#hb-sigv'), smax = $('#hb-smax'), smid = $('#hb-smid'), smin = $('#hb-smin');
   const WIN = 30000, pts = []; let okAt = 0, lastM = null, dotsSig = '';
+  const views = [];       // weitere Anzeigen derselben Kurve (zum Beispiel „Upload“ auf der Live-Seite): gleiche Daten, Skala, Kurve und Farbe wie oben
+
+  /* Kurve mit Skala wie in der Kopfzeile, zum Einbauen an anderer Stelle (nur Skala und Kurve; der Wert steht dort in der eigenen Zeile) */
+  Neu.sigMeter = () => {
+    const NS = 'http://www.w3.org/2000/svg', mk = n => document.createElementNS(NS, n);
+    const svg = mk('svg'); svg.setAttribute('viewBox', '0 0 60 28'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true');
+    const g = mk('path'); g.setAttribute('class', 'sg'); g.setAttribute('d', 'M0 1H60M0 14H60M0 27H60'); const pl = mk('polyline'); pl.setAttribute('points', ''); svg.append(g, pl);
+    const scale = [h('i'), h('i'), h('i')]; scale[2].textContent = '0';
+    const el = h('span', { class: 'hsig', role: 'img' }, h('span', { class: 'hsig__scale', 'aria-hidden': 'true' }, scale), svg);
+    if (sig.dataset.tone) el.dataset.tone = sig.dataset.tone;
+    views.push({ el, scale, line: pl }); if (pts.length) draw();
+    return el;
+  };
 
   /* Upload der gewählten Leitungen (Mbit/s); bei Nutzdaten der kleinere Wert, wie in der bisherigen Oberfläche */
   function upTotal(m) {
@@ -31,8 +44,9 @@
     const p = pts.map(x => ({ t: Math.max(cut, x.t), v: x.v })), top = nice(Math.max(...p.map(x => x.v)));
     const plot = p.length === 1 ? [{ t: Math.max(cut, now - 2000), v: p[0].v }, p[0]] : p;
     val.textContent = fmt(p[p.length - 1].v, 1);
-    smax.textContent = fmt(top, top % 1 ? 1 : 0); smid.textContent = fmt(top / 2, 1); smin.textContent = '0';   // Skala wie in der bisherigen Oberfläche (Mbit/s)
-    line.setAttribute('points', plot.map(x => (Math.min(60, (x.t - cut) / WIN * 60)).toFixed(1) + ',' + (27 - Math.max(0, Math.min(top, x.v)) / top * 26).toFixed(1)).join(' '));
+    const sc = [fmt(top, top % 1 ? 1 : 0), fmt(top / 2, 1), '0'];      // Skala wie in der bisherigen Oberfläche (Mbit/s)
+    const pl = plot.map(x => (Math.min(60, (x.t - cut) / WIN * 60)).toFixed(1) + ',' + (27 - Math.max(0, Math.min(top, x.v)) / top * 26).toFixed(1)).join(' ');
+    [{ scale: [smax, smid, smin], line }, ...views].forEach(v => { v.scale.forEach((e, i) => { if (e.textContent !== sc[i]) e.textContent = sc[i]; }); v.line.setAttribute('points', pl); });
   }
 
   const camTone = c => c.state === 'live' ? (c.pic === 'wartet' || c.pic === 'aus' ? 'warn' : 'ok') : (c.state === 'unknown' ? '' : 'danger');
@@ -52,7 +66,7 @@
     const q = level(m), active = !!(s && s.active);
     sig.hidden = !active;
     const tone = q == null ? '' : q >= 3 ? 'ok' : q === 2 ? 'warn' : 'danger';
-    if (tone) sig.dataset.tone = tone; else delete sig.dataset.tone;
+    [sig, ...views.map(v => v.el)].forEach(e => { if (tone) e.dataset.tone = tone; else delete e.dataset.tone; });
     const tip = q == null ? 'Verbindung: keine Messung (es wird nicht gesendet)' : q >= 3 ? 'Verbindung: gut' : q === 2 ? 'Verbindung: mäßig' : 'Verbindung: schlecht';
     sig.title = tip; sig.setAttribute('aria-label', tip);
     box.hidden = sig.hidden && !dots.children.length;
