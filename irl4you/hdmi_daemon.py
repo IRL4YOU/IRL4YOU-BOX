@@ -11,6 +11,7 @@ import re
 import secrets
 import signal
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -23,7 +24,7 @@ HDMI_STATUS = "/sys/kernel/debug/hdmirx/status"
 HDMI_AUDIO = "hw:CARD=rockchiphdmiin"
 KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 DEFAULTS = {"enabled": False, "key": "hdmi", "bitrate": 8000, "fps": 30, "audio": "hdmi", "source": "hdmi", "usb_format": "auto"}
-SOURCE_CHOICES = ("hdmi", "usb", "test")
+SOURCE_CHOICES = ("hdmi", "usb", "mobcam", "test")
 TEST_SIZE = (1280, 720)
 TEST_TONES = ((440, -1), (660, 1))
 TEST_LOGO = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='3' y='3' width='58' height='58' rx='14' fill='#0f172a' stroke='#22d3ee' stroke-width='4'/>"
@@ -33,6 +34,11 @@ USB_FORMAT_CHOICES = ("auto", "mjpeg", "h264")
 SYS_V4L = "/sys/class/video4linux"
 PROC_ASOUND = "/proc/asound"
 SYS_USB = "/sys/bus/usb/devices"
+SYS_TYPEC = "/sys/class/typec"
+APPLE_VENDOR = "05ac"
+MOBCAM_HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobcam_feed.py")
+MOBCAM_WAIT = "Warte auf Moblin"
+MOBCAM_PHONE_TEXT = "Kein iPhone angeschlossen (USB-Datenkabel, iPhone entsperren, „Vertrauen“ tippen)"
 DJI_VENDOR = "2ca3"
 POWER_WINDOW = 180.0
 POWER_STAY = 10.0
@@ -43,7 +49,8 @@ USB_BAD_AFTER = 3
 PROBE_RETRY_PAUSE = 1.0
 BITRATE_RANGE = (1000, 20000)
 FPS_CHOICES = (25, 30)
-AUDIO_CHOICES = ("hdmi", "usb", "analog", "none")
+MOBCAM_FPS_CHOICES = (25, 30, 50, 60)
+AUDIO_CHOICES = ("hdmi", "usb", "analog", "mobcam", "none")
 ANALOG_CODECS = ("es8388", "es8316", "es8323", "rt5616", "analog")
 NICE = 10
 GRACE = 15.0
@@ -101,17 +108,22 @@ def clean_settings(d, current=None):
             raise ValueError("Bitrate: %d bis %d kbit/s" % BITRATE_RANGE)
         out["bitrate"] = b
     if "fps" in d:
-        if isinstance(d["fps"], bool) or d["fps"] not in FPS_CHOICES:
-            raise ValueError("Bildrate: 25 oder 30")
+        if isinstance(d["fps"], bool) or d["fps"] not in MOBCAM_FPS_CHOICES:
+            raise ValueError("Bildrate: 25 oder 30 (mit dem iPhone auch 50 oder 60)")
         out["fps"] = d["fps"]
     if "audio" in d:
         if d["audio"] not in AUDIO_CHOICES:
-            raise ValueError("Ton: HDMI-Ton, USB-Tonkarte, Analogeingang oder ohne Ton")
+            raise ValueError("Ton: HDMI-Ton, USB-Tonkarte, Analogeingang, iPhone-Mikrofon oder ohne Ton")
         out["audio"] = d["audio"]
     if "source" in d:
         if d["source"] not in SOURCE_CHOICES:
-            raise ValueError("Quelle: HDMI-Eingang, USB-Webcam oder Testbild")
+            raise ValueError("Quelle: HDMI-Eingang, USB-Webcam, iPhone (Mobcam) oder Testbild")
         out["source"] = d["source"]
+    allowed = MOBCAM_FPS_CHOICES if out["source"] == "mobcam" else FPS_CHOICES
+    if out["fps"] not in allowed:
+        if "fps" in d:
+            raise ValueError("Bildrate: 25, 30, 50 oder 60" if out["source"] == "mobcam" else "50 und 60 Bilder pro Sekunde gibt es nur mit dem iPhone (Mobcam)")
+        out["fps"] = 30
     if "usb_format" in d:
         if d["usb_format"] not in USB_FORMAT_CHOICES:
             raise ValueError("Bildformat: Automatisch, MJPEG oder H.264")
@@ -284,6 +296,56 @@ def find_extra_audio(kind, asound=PROC_ASOUND, exclude=None):
     return None
 
 
+def find_apple_phone(sysusb=SYS_USB):
+    """Ein am USB angeschlossenes iPhone oder iPad (Hersteller Apple, Gerät, keine Schnittstelle)."""
+    try:
+        names = sorted(os.listdir(sysusb))
+    except OSError:
+        return None
+    for n in names:
+        if ":" in n or not re.match(r"^\d+-[\d.]+$", n):
+            continue
+        base = os.path.join(sysusb, n)
+        if _read(os.path.join(base, "idVendor"), 8).lower() == APPLE_VENDOR:
+            return {"name": _read(os.path.join(base, "product"), 60) or "iPhone", "id": (_read(os.path.join(base, "idVendor"), 8) + ":" + _read(os.path.join(base, "idProduct"), 8)).lower()}
+    return None
+
+
+def typec_make_host(typec=SYS_TYPEC):
+    """Hängt ein Apple-Gerät am USB-C-Anschluss, auf dem die Box als Gerät arbeitet, schaltet die Box per USB-PD auf Host. True = umgeschaltet."""
+    try:
+        ports = sorted(n for n in os.listdir(typec) if re.match(r"^port\d+$", n))
+    except OSError:
+        return False
+    for p in ports:
+        role = _read(os.path.join(typec, p, "data_role"), 40)
+        if "[device]" not in role:
+            continue
+        ident = _read(os.path.join(typec, p + "-partner", "identity", "id_header"), 20)
+        try:
+            vendor = int(ident, 16) & 0xFFFF
+        except ValueError:
+            continue
+        if "%04x" % vendor != APPLE_VENDOR:
+            continue
+        try:
+            with open(os.path.join(typec, p, "data_role"), "w") as f:
+                f.write("host")
+        except OSError:
+            continue
+        log.info("USB-C-Anschluss %s: die Box arbeitet jetzt als Host für das iPhone", p)
+        return True
+    return False
+
+
+def mobcam_feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, helper=MOBCAM_HELPER):
+    cfg = clean_settings(cfg)
+    if not (isinstance(rtmp_app, str) and re.match(r"^[a-z0-9_]{1,20}$", rtmp_app)) or not isinstance(rtmp_port, int):
+        raise ValueError("RTMP-Ziel ungültig")
+    return [sys.executable or "/usr/bin/python3", "-u", helper, "--bitrate", str(cfg["bitrate"]), "--fps", str(cfg["fps"]), "--key", cfg["key"],
+            "--rtmp-port", str(rtmp_port), "--rtmp-app", rtmp_app, "--audio", "none" if cfg["audio"] == "none" else "mobcam"]
+
+
 def usb_candidates(fmt):
     if fmt in ("mjpeg", "h264"):
         return tuple(sorted(USB_CANDIDATES, key=lambda c: c[0] != fmt))
@@ -378,7 +440,7 @@ def friendly_error(lines, usb=False):
 class Daemon:
     def __init__(self, state_dir, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, stat_url=STAT_URL, device=HDMI_DEVICE,
                  status_file=HDMI_STATUS, audio_device=HDMI_AUDIO, read_status=None, spawn=None, publishing=None, clock=time.monotonic,
-                 sysfs=SYS_V4L, asound=PROC_ASOUND, probe=None, sysusb=SYS_USB):
+                 sysfs=SYS_V4L, asound=PROC_ASOUND, probe=None, sysusb=SYS_USB, typec=SYS_TYPEC):
         self.state_dir = state_dir
         self.config_file = os.path.join(state_dir, "hdmi.json")
         self.token_path = os.path.join(state_dir, "hdmi-token")
@@ -388,7 +450,7 @@ class Daemon:
         self._spawn = spawn or self._spawn_process
         self._publishing = publishing or (lambda key: rtmp_publishing(key, self.stat_url))
         self.clock = clock
-        self.sysfs, self.asound, self.sysusb = sysfs, asound, sysusb
+        self.sysfs, self.asound, self.sysusb, self.typec = sysfs, asound, sysusb, typec
         self.dji_seen = {}
         self._probe_run = probe or self._probe_process
         self.usb = {"present": False, "name": "", "node": "", "format": "", "audio": "", "power": False}
@@ -449,7 +511,7 @@ class Daemon:
 
     @property
     def available(self):
-        if self.cfg.get("source") in ("usb", "test"):
+        if self.cfg.get("source") in ("usb", "mobcam", "test"):
             return True
         return os.path.exists(self.device)
 
@@ -531,6 +593,16 @@ class Daemon:
             self.usb = dict(self.usb, power=self._usb_power_problem(cam), present=bool(cam), name=cam["name"] if cam else "", node=cam["node"] if cam else "",
                             format=usb_caps(self.usb_choice[1])[0] if cam and self.usb_choice and self.usb_choice[0] == cam["node"] else "")
             return sig
+        if self.cfg.get("source") == "mobcam":
+            self.signal_known = True
+            sig = parse_hdmirx_status("")
+            if self.cfg.get("enabled"):
+                typec_make_host(self.typec)
+            phone = find_apple_phone(self.sysusb)
+            if phone:
+                sig.update(plugged=True, locked=True, device="mobcam")
+            self.usb = dict(self.usb, power=False, present=bool(phone), name=phone["name"] if phone else "", node="", format="", audio="mobcam")
+            return sig
         loop = asyncio.get_event_loop()
         try:
             text = await loop.run_in_executor(None, self._read_status)
@@ -583,6 +655,8 @@ class Daemon:
                 return
             self.usb_cur = (self.usb["node"], cand)
             sig = dict(sig, width=cand[1], height=cand[2], fps=float(cand[3]), device=self.usb["node"])
+        elif self.cfg.get("source") == "mobcam":
+            argv = mobcam_feeder_argv(self.cfg, self.rtmp_port, self.rtmp_app)
         else:
             argv = feeder_argv(self.cfg, self.rtmp_port, self.rtmp_app, self.device, self.audio_device,
                                find_extra_audio(self.cfg.get("audio"), self.asound))
@@ -662,7 +736,7 @@ class Daemon:
         if self.signal_known and not sig["locked"]:
             if running:
                 await self._stop()
-            self.state, self.message, self.fails = "waiting", (self._usb_waiting_message() if self.cfg.get("source") == "usb" else "Kein HDMI-Signal"), 0
+            self.state, self.message, self.fails = "waiting", (self._usb_waiting_message() if self.cfg.get("source") == "usb" else MOBCAM_PHONE_TEXT if self.cfg.get("source") == "mobcam" else "Kein HDMI-Signal"), 0
             return
         if running:
             if self.signal_known and signal_id(sig) != self.sig_at_start:
@@ -683,6 +757,10 @@ class Daemon:
         pub = await loop.run_in_executor(None, self._publishing, self.cfg["key"])
         self.published = pub
         age = now - self.started
+        if self.cfg.get("source") == "mobcam" and self.tail and MOBCAM_WAIT in self.tail[-1]:
+            self.started = now
+            self.state, self.message, self.missing_since = "starting", MOBCAM_WAIT + " (Stream-Adresse mobcam://localhost:7790)", None
+            return
         if pub is None:
             if age >= 5:
                 self.state, self.message = "streaming", ""
@@ -716,6 +794,11 @@ class Daemon:
             return self.status()
         if cmd == "set":
             new = clean_settings(req.get("settings"), self.cfg)
+            if new.get("source") != self.cfg.get("source"):
+                if new["source"] == "mobcam" and new["audio"] == "hdmi":
+                    new["audio"] = "mobcam"
+                elif new["source"] != "mobcam" and new["audio"] == "mobcam":
+                    new["audio"] = "hdmi"
             changed = new != self.cfg
             if new.get("usb_format") != self.cfg.get("usb_format"):
                 self.usb_choice, self.usb_bad, self.usb_quick_fails = None, set(), 0
