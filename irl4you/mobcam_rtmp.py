@@ -28,7 +28,7 @@ STATS = bool(os.environ.get("IRL4YOU_MOBCAM_STATS"))
 # bevor er die Kette erreicht; gemessen über die ersten WINDOW_US Mikrosekunden Bildzeit und danach fortlaufend.
 MAX_MBIT = 12.0
 WINDOW_US = 2000000
-TOO_HIGH = "Die Bitrate in Moblin ist zu hoch. Bitte höchstens 10 Mbit/s einstellen."
+TOO_HIGH = "Die Bitrate der Mobcam ist zu hoch. Bitte in Moblin höchstens 10 Mbit/s einstellen."
 
 
 class TooHigh(Exception):
