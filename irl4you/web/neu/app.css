@@ -10,6 +10,8 @@
   .nav a:hover { background: var(--surface-2); color: var(--text-1); }
   .nav a[aria-current="page"] { background: var(--accent-subtle); color: var(--accent-text); }
   .nav-dot { margin-left: auto; color: var(--warn); }
+  .tab-dot { display: inline-block; margin-left: var(--space-2); color: var(--warn); vertical-align: middle; }
+  .tab-dot[hidden] { display: none; }
   .nav-dot[data-tone="danger"] { color: var(--danger); }
   .side__foot { margin-top: auto; display: grid; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-3); padding: 0 var(--space-2); }
   .side__foot a { color: var(--text-2); }
