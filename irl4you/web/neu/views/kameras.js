@@ -194,11 +194,11 @@
       scanList.replaceChildren(...(d.scan || []).map(r => row({ icon: 'camera', title: r.name, desc: `${r.model} · ${r.addr} · ${r.rssi} dBm`, end: r.paired ? badge('hinzugefügt') : btn('Hinzufügen', { size: 'sm', variant: 'primary', run: async () => { if (await djiCmd({ cmd: 'add', addr: r.addr, name: r.name, model: r.model, kind: r.kind })) { App.data['metrics:refresh'](); toast('Kamera hinzugefügt'); } } }) })).map(r => list(r)));
     }
     App.on('dji', renderScan);
-    T.add('k-neu', 'Hinzufügen', h('div', { class: 'cols-2' },
-      h('div', { class: 'col' }, card({ title: 'Handy oder Kamera (RTMP)', sub: 'Die Kamera sendet an eine Adresse der Box. Du bekommst sie nach dem Anlegen.', body: [field({ label: 'Name', control: nm }), field({ label: 'Schlüssel', control: key, hint: 'Leer lassen für automatisch.' }), formErr], foot: [addRtmp] }),
-        card({ title: 'Mit QR-Code einrichten', sub: 'Legt eine Kamera an und zeigt den Code für die App.', body: [field({ label: 'App', control: qrnApp, hint: 'IRL Pro und Moblin: Code mit der Kamera-App scannen. GoPro: zuerst den Hotspot der Box einrichten, dann die Codes 1, 2, 3 nacheinander vor die Kamera halten.' }), qrnOut], foot: [qrnGo] })),
-      h('div', { class: 'col' }, card({ title: 'DJI-Kamera (Bluetooth)', sub: 'Kamera einschalten und wach halten, Kopplung an der Kamera bestätigen. Unterstützt: Osmo Action 3, 4, 5 Pro, 6 und Osmo Pocket 3, 4 und 4 Pro.', body: [djiNote, adaptNote, scanBtn, scanList] }),
-        card({ title: 'HDMI, USB und Testbild', body: [h('p', { class: 'muted', style: 'font-size:var(--text-sm)' }, 'Ein HDMI-Eingang, eine USB-Webcam oder ein Testbild wird zu einer normalen Kamera.'), btn('Einstellungen öffnen', { onclick: () => Neu.goto('kameras', 'k-hdmi') })] }))));
+    T.add('k-neu', 'Hinzufügen', h('div', { class: 'cols-2' },       // Reihenfolge: 1. DJI (Bluetooth), 2. HDMI/USB/Testbild, 3. RTMP, 4. QR-Code
+      card({ title: 'DJI-Kamera (Bluetooth)', sub: 'Kamera einschalten und wach halten, Kopplung an der Kamera bestätigen. Unterstützt: Osmo Action 3, 4, 5 Pro, 6 und Osmo Pocket 3, 4 und 4 Pro.', body: [djiNote, adaptNote, scanBtn, scanList] }),
+      card({ title: 'HDMI, USB und Testbild', body: [h('p', { class: 'muted', style: 'font-size:var(--text-sm)' }, 'Ein HDMI-Eingang, eine USB-Webcam oder ein Testbild wird zu einer normalen Kamera.'), btn('Einstellungen öffnen', { onclick: () => Neu.goto('kameras', 'k-hdmi') })] }),
+      card({ title: 'Handy oder Kamera (RTMP)', sub: 'Die Kamera sendet an eine Adresse der Box. Du bekommst sie nach dem Anlegen.', body: [field({ label: 'Name', control: nm }), field({ label: 'Schlüssel', control: key, hint: 'Leer lassen für automatisch.' }), formErr], foot: [addRtmp] }),
+      card({ title: 'Mit QR-Code einrichten', sub: 'Legt eine Kamera an und zeigt den Code für die App.', body: [field({ label: 'App', control: qrnApp, hint: 'IRL Pro und Moblin: Code mit der Kamera-App scannen. GoPro: zuerst den Hotspot der Box einrichten, dann die Codes 1, 2, 3 nacheinander vor die Kamera halten.' }), qrnOut], foot: [qrnGo] })));
 
     /* ---------- Reiter: HDMI und USB ---------- */
     const hdmiBox = h('div'); let hdmiDirty = false, hdmiBusy = false, hdmiSig = '';
