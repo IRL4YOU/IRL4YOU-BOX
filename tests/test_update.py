@@ -257,6 +257,7 @@ class Base(unittest.TestCase):
             "root": os.path.join(self.tmp, "opt", "irl4you"), "extra_link": os.path.join(self.tmp, "opt", "pipbox"),
             "state_dir": os.path.join(self.tmp, "state"), "status_file": os.path.join(self.tmp, "run", "status.json"),
             "request_file": os.path.join(self.tmp, "state", "swupdate-request"),
+            "cancel_file": os.path.join(self.tmp, "state", "swupdate-cancel"),
             "log_file": os.path.join(self.tmp, "update.log"), "token_file": "", "busy_processes": "",
             "busy_units": "pipbox-send.service", "systemctl": self.sysctl, "health_timeout": "0", "min_free_mb": "1",
         }
@@ -294,6 +295,62 @@ class Base(unittest.TestCase):
 
     def rid(self, c):
         return c["sha"][:12]
+
+
+class TestAbbruch(Base):
+    """Ein hängendes Update lässt sich beenden, aber nur in der Vorbereitung und erst nach 5 Minuten ohne Lebenszeichen."""
+
+    T = 100000
+
+    def setUp(self):
+        super().setUp()
+        self.u = U.Updater(U.Config(path=None, overrides=self.overrides), now=lambda: self.T, sleep=lambda s: None)
+
+    def stand(self, step, vor):
+        self.u.status(state="installing", step=step, progress=10)
+        d = self.u.load_status()
+        d["time"] = self.T - vor
+        with open(self.overrides["status_file"], "w") as f:
+            json.dump(d, f)
+        os.makedirs(os.path.dirname(self.overrides["cancel_file"]), exist_ok=True)
+        with open(self.overrides["cancel_file"], "w"):
+            pass
+
+    def stoppt(self):
+        return [c for c in self.calls() if "stop" in c and "irl4you-update" in c]
+
+    def test_erst_nach_fuenf_minuten(self):
+        self.stand("Lade neue Version", 120)
+        self.u.cancel()
+        self.assertEqual(self.status()["state"], "installing")
+        self.assertEqual(self.stoppt(), [])
+        self.assertFalse(os.path.exists(self.overrides["cancel_file"]))          # die Anforderung ist trotzdem abgeräumt
+
+    def test_haengendes_laden_wird_beendet(self):
+        self.stand("Lade neue Version", 400)
+        self.u.cancel()
+        self.assertEqual(self.status()["state"], "failed")
+        self.assertIn("abgebrochen", self.status()["message"])
+        self.assertTrue(any("irl4you-update.service" in c for c in self.stoppt()))
+
+    def test_beim_umschalten_nie(self):
+        for step in ("Schalte auf 0.5.1 um", "Starte die Dienste neu", "Zurück auf 0.5.0"):
+            self.stand(step, 4000)
+            self.u.cancel()
+            self.assertEqual(self.status()["state"], "installing", step)
+        self.assertEqual(self.stoppt(), [])
+
+    def test_ohne_laufendes_update_nichts(self):
+        self.u.status(state="idle", step="")
+        self.u.cancel()
+        self.assertEqual(self.stoppt(), [])
+
+    def test_reste_des_ladens_werden_geraeumt(self):
+        c = self.gh.add()
+        rel = os.path.join(self.tmp, "opt", "irl4you", "releases")
+        os.makedirs(os.path.join(rel, ".dl-alt"))
+        self.u.install()
+        self.assertNotIn(".dl-alt", os.listdir(rel))
 
 
 class TestConfig(unittest.TestCase):
