@@ -361,9 +361,11 @@ class Updater:
                 raise Refuse("GitHub lehnt die Anfrage ab (%d). Schlüssel oder Anfragegrenze prüfen." % e.code)
             if e.code in (404, 422):
                 raise Refuse("Repository, Zweig oder Commit nicht gefunden (%d)" % e.code)
+            if e.code >= 500:
+                raise Refuse("GitHub antwortet gerade nicht (Fehler %d). Das liegt bei GitHub und ist meist nach ein paar Minuten vorbei: bitte später noch einmal nach Updates suchen." % e.code)
             raise Refuse("GitHub antwortet mit %d" % e.code)
-        except urllib.error.URLError as e:
-            raise Refuse("GitHub nicht erreichbar: %s" % (str(e.reason)[:80],))
+        except (urllib.error.URLError, TimeoutError) as e:
+            raise Refuse("GitHub nicht erreichbar: %s. Bitte später noch einmal nach Updates suchen." % (str(getattr(e, "reason", e))[:80],))
 
     def _json(self, path, cache=None):
         """Antwort der GitHub-Schnittstelle als JSON. Mit cache=<Name> wird die Antwort samt ETag in der Ablage gemerkt und beim nächsten Mal bedingt
