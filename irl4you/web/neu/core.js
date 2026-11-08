@@ -2,6 +2,13 @@
 (() => {
   'use strict';
   const NS = 'http://www.w3.org/2000/svg';
+
+  /* Gleicher Text wird nicht neu geschrieben: Viele Anzeigen setzen bei jeder Messung denselben Wert; das Ersetzen des Textes zeichnet die Stelle jedes Mal neu und die Seite flackert. */
+  try {
+    const d = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+    if (d && d.set && d.get) Object.defineProperty(Node.prototype, 'textContent', { configurable: true, enumerable: d.enumerable, get: d.get,
+      set(v) { const t = v == null ? '' : String(v); if (this.nodeType === 1) { const f = this.firstChild; if (f && f === this.lastChild && f.nodeType === 3 && f.nodeValue === t) return; if (!f && t === '') return; } d.set.call(this, v); } });
+  } catch (e) { /* ältere Browser: bleibt wie bisher */ }
   const PROPS = new Set(['value', 'checked', 'disabled', 'hidden', 'selected', 'open', 'indeterminate', 'readOnly', 'min', 'max', 'step']);
 
   /* ---- Elemente bauen. Text wird immer als Text eingesetzt (kein HTML aus Daten). ---- */
