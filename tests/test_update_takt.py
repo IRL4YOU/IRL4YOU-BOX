@@ -135,6 +135,14 @@ class TestUpdateTakt(unittest.TestCase):
             w = f.read()
         self.assertIn("for r in rels[:15]:", w)
 
+    def test_github_stoerung_hat_verstaendliche_meldung(self):
+        # 5xx und Zeitüberschreitung bei GitHub: sagen, dass es bei GitHub liegt und später wieder geht
+        with open(os.path.join(ROOT, "updater", "irl4you_update.py"), encoding="utf-8") as f:
+            u = f.read()
+        self.assertIn("GitHub antwortet gerade nicht (Fehler %d)", u)
+        self.assertIn("except (urllib.error.URLError, TimeoutError) as e:", u)
+        self.assertIn("bitte später noch einmal nach Updates suchen", u)
+
     def test_prueft_nur(self):
         # Die Prüfung ruft "auto" auf; installiert wird nur mit auto_install in update.conf (Standard: aus)
         self.assertIn("ExecStart=/usr/local/sbin/irl4you-update auto", _text("irl4you-update-auto.service"))
