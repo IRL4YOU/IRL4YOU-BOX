@@ -97,8 +97,8 @@
       const sel = select(sr.servers.map(s => [s.id, `${s.name} · ${s.host}:${s.port}`]), sr.selected, v => run(null, async () => { await api('POST', '/api/srtla/select', { id: v }); App.set('srtla', await api('GET', '/api/srtla')); App.data['send:refresh'](); }, 'Server gewählt'));
       sel.disabled = !sr.servers.length;
       const mx = range({ s: 'Höchste Bitrate', k: 'bitrate kbit qualität maximum', label: 'Höchste Bitrate', min: 1000, max: 20000, step: 500, value: Math.min(20000, Math.max(1000, draft.max_kbps)), unit: ' kbit/s', oninput: v => { draft.max_kbps = v; } });
-      const mn = range({ s: 'Niedrigste Bitrate', k: 'bitrate kbit minimum', label: 'Niedrigste Bitrate', min: 100, max: 2000, step: 50, value: Math.min(2000, Math.max(100, draft.min_kbps)), unit: ' kbit/s', oninput: v => { draft.min_kbps = v; } });
-      const lat = range({ s: 'Latenz', k: 'verzögerung puffer ms latenz', label: 'Latenz', min: 500, max: 8000, step: 100, value: Math.min(8000, Math.max(500, draft.latency_ms || 4000)), unit: ' ms', oninput: v => { draft.latency_ms = v; } });
+      const mn = range({ s: 'Niedrigste Bitrate', k: 'bitrate kbit minimum', label: 'Niedrigste Bitrate', min: 450, max: 2000, step: 50, value: Math.min(2000, Math.max(450, draft.min_kbps)), unit: ' kbit/s', oninput: v => { draft.min_kbps = v; } });
+      const lat = range({ s: 'Latenz', k: 'verzögerung puffer ms latenz', label: 'Latenz', min: 1000, max: 8000, step: 100, value: Math.min(8000, Math.max(1000, draft.latency_ms || 4000)), unit: ' ms', oninput: v => { draft.latency_ms = v; } });
       const spread = seg('spread', [['best', 'Beste bevorzugen'], ['all', 'Alle gleichzeitig']], draft.spread || 'best', v => { draft.spread = v; }, 'Verteilung');
       server.replaceChildren(
         card({ title: 'SRTLA-Server', sub: sr.servers.length ? null : 'Noch kein Server angelegt. Ohne Server kannst du nicht live gehen.', actions: [btn('Neu', { size: 'sm', ico: 'plus', onclick: () => serverForm(null) })], body: [
