@@ -158,6 +158,20 @@ class TestFusszeileUndLinks(unittest.TestCase):
         pos = [blk.index(t) for t in ("DJI-Kamera (Bluetooth)", "HDMI, USB und Testbild", "Handy oder Kamera (RTMP)", "Mit QR-Code einrichten")]
         self.assertEqual(pos, sorted(pos))
 
+    def test_kopfleiste_knoepfe_nur_mit_symbol(self):
+        # Streammodus (Auge) und Suche (Lupe) brauchen keinen langen Text: Symbol, Hinweis beim Darüberfahren, Beschriftung für Bildschirmleser
+        index = _read(os.path.join(WEB, "neu", "index.html"))
+        sm = index[index.index('id="sm-btn"') - 40:index.index("</button>", index.index('id="sm-btn"'))]
+        self.assertIn("data-icon", sm)
+        self.assertIn("#i-eyeoff", sm)
+        self.assertNotIn("Streammodus: aus</span>", sm)
+        se = index[index.index('id="open-search"') - 40:index.index("</button>", index.index('id="open-search"'))]
+        self.assertIn("data-icon", se)
+        self.assertNotIn("Strg K</span>", se)
+        boot = _read(os.path.join(WEB, "neu", "boot.js"))
+        self.assertIn("'#i-eye' : '#i-eyeoff'", boot)
+        self.assertIn("b.setAttribute('aria-label', t)", boot)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
