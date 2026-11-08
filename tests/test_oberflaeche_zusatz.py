@@ -208,15 +208,15 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertNotIn("upHist", live)
         self.assertNotIn("spark-box", live)
 
-    def test_stopp_heisst_ueberall_stopp(self):
+    def test_stop_heisst_ueberall_stop(self):
         # Kopfzeile, Fußleiste, großer Knopf und Vorschau: dieselbe kurze Beschriftung
         schnell = _read(os.path.join(WEB, "neu", "views", "schnell.js"))
         live = _read(os.path.join(WEB, "neu", "views", "live.js"))
-        self.assertIn("label: 'Stopp', variant: 'danger'", schnell)
-        self.assertIn("btn(running ? 'Stopp' : 'Bitte warten'", live)
-        self.assertIn("ico('stop', 'sm'), 'Stopp')", live)
+        self.assertIn("label: 'Stop', variant: 'danger'", schnell)
+        self.assertIn("btn(running ? 'Stop' : 'Bitte warten'", live)
+        self.assertIn("ico('stop', 'sm'), 'Stop')", live)
         self.assertNotIn("'Beenden'", live)
-        self.assertNotIn("'Stop'", live + schnell)
+        self.assertNotIn("'Stopp'", live + schnell)
 
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
