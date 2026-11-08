@@ -337,6 +337,7 @@ class HdmiService:
     HOST, PORT = "127.0.0.1", 9102
     CAMERA_NAMES = ("HDMI", "HDMI-Eingang", "HDMI 2")
     USB_NAMES = ("USB-Kamera", "USB-Webcam", "USB 2")
+    MOBCAM_NAMES = ("Mobcam", "Mobcam 2")
     TEST_NAMES = ("Testbild", "Testbild 2")
     ALLOWED = ("enabled", "bitrate", "fps", "audio", "source", "usb_format")
     TTL = 1.5
@@ -405,12 +406,33 @@ class HdmiService:
         roles = {c["role"] for c in self.cams.cams}
         role = "main" if "main" not in roles else "pip" if "pip" not in roles else "extra"
         taken = {c["name"].casefold() for c in self.cams.cams}
-        names = self.TEST_NAMES if source == "test" else self.USB_NAMES if source == "usb" else self.CAMERA_NAMES
-        name = next((n for n in names if n.casefold() not in taken), "USB-Kamera 2" if source == "usb" else "Testbild 3" if source == "test" else "HDMI-Kamera")
+        names = self.TEST_NAMES if source == "test" else self.MOBCAM_NAMES if source == "mobcam" else self.USB_NAMES if source == "usb" else self.CAMERA_NAMES
+        name = next((n for n in names if n.casefold() not in taken), "USB-Kamera 2" if source == "usb" else "Mobcam 3" if source == "mobcam" else "Testbild 3" if source == "test" else "HDMI-Kamera")
         try:
             self.cams.add(name, HDMI_KEY, role)
         except ValueError:
             pass
+
+    def _auto_names(self):
+        return {n.casefold() for t in (self.CAMERA_NAMES, self.USB_NAMES, self.MOBCAM_NAMES, self.TEST_NAMES) for n in t} | {"hdmi-kamera", "usb-kamera 2", "mobcam 3", "testbild 3"}
+
+    def rename_for(self, source):
+        """Hat die Kamera noch einen Standardnamen (HDMI, USB-Kamera, Mobcam, Testbild), bekommt sie beim Quellenwechsel den passenden."""
+        if not self.cams:
+            return
+        cam = next((c for c in self.cams.cams if c["key"] == HDMI_KEY), None)
+        if cam is None or cam["name"].casefold() not in self._auto_names():
+            return
+        names = self.TEST_NAMES if source == "test" else self.MOBCAM_NAMES if source == "mobcam" else self.USB_NAMES if source == "usb" else self.CAMERA_NAMES
+        if cam["name"] in names:
+            return
+        taken = {c["name"].casefold() for c in self.cams.cams if c is not cam}
+        name = next((n for n in names if n.casefold() not in taken), None)
+        if name:
+            try:
+                self.cams.update(cam["id"], name=name)
+            except (ValueError, KeyError):
+                pass
 
     def status(self):
         now = time.monotonic()
@@ -440,11 +462,14 @@ class HdmiService:
         if not isinstance(req, dict):
             raise ValueError("Ungültige Anfrage")
         settings = {k: req[k] for k in self.ALLOWED if k in req}
-        hdmi_daemon.clean_settings(settings, self.fake if self.demo else None)
+        cur = self.fake if self.demo else (self.status().get("settings") if self.status().get("service") else None)
+        hdmi_daemon.clean_settings(settings, cur)
         if self.demo:
             self.fake = hdmi_daemon.clean_settings(settings, self.fake)
         elif settings:
             self._call({"cmd": "set", "settings": settings})
+        if settings.get("source"):
+            self.rename_for(settings["source"])
         if settings.get("enabled") is True:
             self.ensure_listed(settings.get("source") or (self.fake or {}).get("source") or self._last_source())
         with self.lock:
