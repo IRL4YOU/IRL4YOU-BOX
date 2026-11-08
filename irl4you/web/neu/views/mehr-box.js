@@ -38,10 +38,11 @@
      ================================================================= */
   (() => {
     const box = panel('sy-box'); if (!box) return;
-    const host = h('div', { style: 'margin-top:var(--space-5)' }), msg = note(); box.append(host);
+    const slot = panel('sy-box-pw') || box;       // Platz 2 im Reiter „Box“ (zwischen Ausschalten und Aussehen)
+    const host = h('div', slot === box ? { style: 'margin-top:var(--space-5)' } : {}), msg = note(); slot.append(host);
     const bytes = t => new TextEncoder().encode(t).length;
     function render(auth) {
-      if (auth.mode !== 'own') { host.replaceChildren(card({ title: 'Passwort der Oberfläche', body: h('p', { class: 'muted', style: 'font-size:var(--text-sm)', text: auth.mode === 'demo' ? 'In der Vorschau nicht möglich.' : 'Das Passwort lässt sich hier nicht ändern.' }) })); return; }
+      if (auth.mode !== 'own') { host.replaceChildren(card({ title: 'Passwort ändern', body: h('p', { class: 'muted', style: 'font-size:var(--text-sm)', text: auth.mode === 'demo' ? 'In der Vorschau nicht möglich.' : 'Das Passwort lässt sich hier nicht ändern.' }) })); return; }
       const old = input({ type: 'password', autocomplete: 'current-password', maxlength: 128, required: true }), n1 = input({ type: 'password', autocomplete: 'new-password', maxlength: 72, minlength: 10, required: true }), n2 = input({ type: 'password', autocomplete: 'new-password', maxlength: 72, minlength: 10, required: true });
       const rem = sw({ label: 'Angemeldet bleiben', hint: 'Auf diesem Gerät auch nach dem Schließen des Browsers.' });
       const go = h('button', { class: 'btn', type: 'submit', 'data-variant': 'primary' }, 'Passwort ändern');
@@ -55,8 +56,8 @@
           try { await api('POST', '/api/password', { old: old.value, new: n1.value, remember: rem.firstChild.checked }); form.reset(); msg.set('Passwort geändert. Andere Geräte müssen sich neu anmelden.', 'ok'); }
           catch (x) { msg.set(x.message, 'bad'); }
         });
-      } }, field({ label: 'Bisheriges Passwort', control: old, s: 'Passwort der Oberfläche ändern', k: 'passwort ändern anmeldung login' }), field({ label: 'Neues Passwort', control: n1, hint: 'Mindestens 10 Zeichen.' }), field({ label: 'Neues Passwort wiederholen', control: n2 }), rem, msg, h('div', { class: 'cluster' }, go));
-      host.replaceChildren(card({ title: 'Passwort der Oberfläche', sub: 'Das Passwort, mit dem du dich bei dieser Box anmeldest. Nach der Änderung müssen sich alle anderen Geräte neu anmelden.', body: form }));
+      } }, field({ label: 'Bisheriges Passwort', control: old, s: 'Passwort ändern', k: 'passwort ändern anmeldung login' }), field({ label: 'Neues Passwort', control: n1, hint: 'Mindestens 10 Zeichen.' }), field({ label: 'Neues Passwort wiederholen', control: n2 }), rem, msg, h('div', { class: 'cluster' }, go));
+      host.replaceChildren(card({ title: 'Passwort ändern', sub: 'Das Passwort, mit dem du dich bei dieser Box anmeldest. Nach der Änderung müssen sich alle anderen Geräte neu anmelden.', body: form }));
     }
     fetch('/api/auth', { cache: 'no-store' }).then(r => r.json()).then(render).catch(() => { /* ohne Auskunft kein Formular */ });
   })();
