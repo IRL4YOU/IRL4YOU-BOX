@@ -36,7 +36,7 @@ PROC_ASOUND = "/proc/asound"
 SYS_USB = "/sys/bus/usb/devices"
 SYS_TYPEC = "/sys/class/typec"
 APPLE_VENDOR = "05ac"
-MOBCAM_HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobcam_feed.py")
+MOBCAM_HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobcam_rtmp.py")
 MOBCAM_WAIT = "Warte auf Moblin"
 MOBCAM_PHONE_TEXT = "Kein iPhone angeschlossen (USB-Datenkabel, iPhone entsperren, „Vertrauen“ tippen)"
 DJI_VENDOR = "2ca3"
@@ -49,7 +49,6 @@ USB_BAD_AFTER = 3
 PROBE_RETRY_PAUSE = 1.0
 BITRATE_RANGE = (1000, 20000)
 FPS_CHOICES = (25, 30)
-MOBCAM_FPS_CHOICES = (25, 30, 50, 60)
 AUDIO_CHOICES = ("hdmi", "usb", "analog", "mobcam", "none")
 ANALOG_CODECS = ("es8388", "es8316", "es8323", "rt5616", "analog")
 NICE = 10
@@ -108,8 +107,8 @@ def clean_settings(d, current=None):
             raise ValueError("Bitrate: %d bis %d kbit/s" % BITRATE_RANGE)
         out["bitrate"] = b
     if "fps" in d:
-        if isinstance(d["fps"], bool) or d["fps"] not in MOBCAM_FPS_CHOICES:
-            raise ValueError("Bildrate: 25 oder 30 (mit dem iPhone auch 50 oder 60)")
+        if isinstance(d["fps"], bool) or d["fps"] not in FPS_CHOICES:
+            raise ValueError("Bildrate: 25 oder 30")
         out["fps"] = d["fps"]
     if "audio" in d:
         if d["audio"] not in AUDIO_CHOICES:
@@ -119,11 +118,6 @@ def clean_settings(d, current=None):
         if d["source"] not in SOURCE_CHOICES:
             raise ValueError("Quelle: HDMI-Eingang, USB-Webcam, iPhone (Mobcam) oder Testbild")
         out["source"] = d["source"]
-    allowed = MOBCAM_FPS_CHOICES if out["source"] == "mobcam" else FPS_CHOICES
-    if out["fps"] not in allowed:
-        if "fps" in d:
-            raise ValueError("Bildrate: 25, 30, 50 oder 60" if out["source"] == "mobcam" else "50 und 60 Bilder pro Sekunde gibt es nur mit dem iPhone (Mobcam)")
-        out["fps"] = 30
     if "usb_format" in d:
         if d["usb_format"] not in USB_FORMAT_CHOICES:
             raise ValueError("Bildformat: Automatisch, MJPEG oder H.264")
@@ -342,8 +336,9 @@ def mobcam_feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, helper=MOBCA
     cfg = clean_settings(cfg)
     if not (isinstance(rtmp_app, str) and re.match(r"^[a-z0-9_]{1,20}$", rtmp_app)) or not isinstance(rtmp_port, int):
         raise ValueError("RTMP-Ziel ungültig")
-    return [sys.executable or "/usr/bin/python3", "-u", helper, "--bitrate", str(cfg["bitrate"]), "--fps", str(cfg["fps"]), "--key", cfg["key"],
-            "--rtmp-port", str(rtmp_port), "--rtmp-app", rtmp_app, "--audio", "none" if cfg["audio"] == "none" else "mobcam"]
+    # Bild und Ton gehen unverändert durch (kein Kodieren): Bitrate, Bildrate und Codec (H.264 oder H.265) stellt man in Moblin ein
+    return [sys.executable or "/usr/bin/python3", "-u", helper, "--key", cfg["key"], "--rtmp-port", str(rtmp_port), "--rtmp-app", rtmp_app,
+            "--audio", "none" if cfg["audio"] == "none" else "mobcam"]
 
 
 def usb_candidates(fmt):
@@ -498,6 +493,8 @@ class Daemon:
         try:
             with open(self.config_file) as f:
                 saved = json.load(f)
+            if isinstance(saved, dict) and saved.get("fps") not in FPS_CHOICES:
+                saved["fps"] = 30          # die erste Mobcam-Fassung erlaubte 50 und 60; diese Werte werden nicht mehr gebraucht (Moblin gibt die Bildrate vor)
             return clean_settings(saved)
         except (OSError, ValueError):
             return dict(DEFAULTS)
