@@ -116,6 +116,17 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertIn('href="/alt" id="oldui"', index)
         self.assertIn('<a href="/alt" data-oldui>Bisherige Oberfläche</a>', index)      # auch in der Fußzeile (am Handy fehlt die Seitenleiste)
 
+    def test_update_karte_zeigt_wartende_version_statt_aktuell(self):
+        # wartet der neueste Stand noch auf die GitHub-Prüfung, darf die Karte nicht grün "aktuell" sagen
+        sysjs = _read(os.path.join(WEB, "neu", "views", "system.js"))
+        self.assertIn("else if (d.pending) m = 'Neue Version '", sysjs)
+        self.assertIn("badge('kommt gleich', 'accent')", sysjs)
+        self.assertIn("Das Update kommt in wenigen Minuten.", sysjs)
+        self.assertLess(sysjs.index("else if (d.pending) m ="), sysjs.index("m = 'Du hast die neueste Version.'"))
+        up = _read(os.path.join(IRL, "webui", "updates.py"))
+        self.assertIn('"pending": bool(latest and chk.get("pending") and not chk.get("available"))', up)
+        self.assertIn("PENDING_WAIT", up)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)

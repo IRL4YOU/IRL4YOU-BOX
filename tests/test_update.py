@@ -352,14 +352,17 @@ class TestCheck(Base):
         self.u.install()
         self.assertEqual(self.u.check()[1], False)
         self.assertEqual(self.status()["message"], "IRL4YOU ist aktuell.")
+        self.assertIs(self.status()["pending"], False)
 
     def test_ci_gate(self):
         self.gh.add(ci="pending")
         self.assertEqual(self.u.check()[1], False)
         self.assertIn("geprüft", self.status()["message"])
+        self.assertIs(self.status()["pending"], True)         # die Oberfläche zeigt dann "kommt in wenigen Minuten" statt "aktuell"
         self.gh.commits[0]["ci"] = "failure"
         self.assertEqual(self.u.check()[1], False)
         self.assertIn("fehlgeschlagen", self.status()["message"])
+        self.assertIs(self.status()["pending"], False)
         self.assertEqual(self.make(require_ci="false").check()[1], True)
 
     def test_no_ci_configured(self):
