@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 
-from .camservices import HDMI_KEY
+from .camservices import HDMI_KEY, hdmi_daemon
 from .common import read
 
 
@@ -239,12 +239,16 @@ class OutageWatch:
             if isinstance(hdmi, dict) and hdmi.get("service") is not False and hdmi.get("available") is not False:
                 en = bool((hdmi.get("settings") or {}).get("enabled"))
                 sig = hdmi.get("signal") or {}
-                bad = hdmi.get("state") == "error" or (en and hdmi.get("signal_known") and sig.get("plugged") is False)
+                rate = bool(en and hdmi.get("message") == hdmi_daemon.MOBCAM_TOO_HIGH)       # Mobcam: Bitrate in Moblin zu hoch, schnell melden
+                bad = rate or hdmi.get("state") == "error" or (en and hdmi.get("signal_known") and sig.get("plugged") is False)
             if bad:
                 if self.hdmi_since is None:
                     self.hdmi_since = now
-                if self.DOWN <= now - self.hdmi_since <= self.MAX and ("hdmi", int(self.hdmi_since)) not in self.closed:
-                    out.append({"level": "warn", "kind": "hdmi", "src": (hdmi.get("settings") or {}).get("source", "hdmi"), "t": int(self.hdmi_since)})
+                if (3.0 if rate else self.DOWN) <= now - self.hdmi_since <= self.MAX and ("hdmi", int(self.hdmi_since)) not in self.closed:
+                    a = {"level": "warn", "kind": "hdmi", "src": (hdmi.get("settings") or {}).get("source", "hdmi"), "t": int(self.hdmi_since)}
+                    if rate:
+                        a["rate"] = True
+                    out.append(a)
             else:
                 self.hdmi_since = None
         return out
