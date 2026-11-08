@@ -19,10 +19,9 @@ if [ -f install/system-install.sh ]; then
     sh install/system-install.sh
 fi
 
-# 3. Mobcam (iPhone per USB als Kamera): Pakete, Kernelmodul, Programm. Ein Fehler (z. B. kein Netz) bricht das Update nicht ab; das nächste Update versucht es wieder.
-if [ -f install/mobcam/mobcam-setup.sh ] && [ "${IRL4YOU_ACTION:-install}" != rollback ]; then
-    bash install/mobcam/mobcam-setup.sh > /var/log/irl4you-mobcam-setup.log 2>&1 || echo "Hinweis: Mobcam ist noch nicht eingerichtet, siehe /var/log/irl4you-mobcam-setup.log"
-fi
+# 3. Mobcam (iPhone per USB als Kamera) braucht nur usbmuxd. Reste der ersten Fassung (v4l2loopback, eigenes Programm) werden entfernt.
+command -v usbmuxd >/dev/null 2>&1 || apt-get install -y --no-install-recommends usbmuxd || echo "Hinweis: usbmuxd fehlt, Mobcam geht erst nach dessen Installation"
+rm -f /usr/local/bin/mobcam-virtualcam /etc/modprobe.d/irl4you-mobcam.conf /etc/modules-load.d/irl4you-mobcam.conf
 
 systemctl daemon-reload
 systemctl enable --quiet irl4you-update.path irl4you-update-cancel.path irl4you-update-auto.timer || true
