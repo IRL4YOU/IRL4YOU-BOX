@@ -4,6 +4,7 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 
 ## 0.5
 - Mobcam: iPhone mit Moblin per USB-Kabel als Kamera (Kameras > HDMI und USB > Quelle „Mobcam“), Bild und Ton gehen unverändert durch (H.264 oder H.265, kaum Rechenzeit); Ströme über 12 Mbit/s werden abgelehnt, in Moblin höchstens 10 Mbit/s einstellen.
+- IRL4YOU Cam: Android-Handy mit der App „IRL4YOU Cam“ per USB-Kabel als Kamera (Kameras > HDMI und USB > Quelle „IRL4YOU Cam“), ohne Netzwerk und ohne USB-Debugging; Bild und Ton gehen unverändert durch, die Box stellt die Bitrate auf höchstens 10 Mbit/s.
 - Testbild als Kamera-Quelle: bewegtes Wellenmuster mit Schrift, Zeit und Logo, Stereo-Testton (links 440, rechts 660 Hz).
 - Leitungstest: „Testen“ je Leitung und „Alle Leitungen testen“ (Herunterladen, Hochladen, Antwortzeit, auch während der Sendung).
 - Update-Prüfung alle 2 Stunden mit niedrigster Priorität; „Nach Updates suchen“ wartet auf das Ergebnis, auch während der Sendung.
