@@ -310,6 +310,42 @@ class TestMobcamSitzung(unittest.TestCase):
         self.assertEqual(sent[0][2][0], 0x17)                                              # H.264: Kennung 7
 
 
+class TestMobcamBildgroesse(unittest.TestCase):
+    """Bildgröße und Codec stehen in der Karte und im Journal (vorher "0x0@?")."""
+
+    def test_zeile_des_hilfsprogramms_wird_gelesen_und_angezeigt(self):
+        hd = irl("hdmi_daemon")
+        usb = tempfile.mkdtemp()
+        _write(os.path.join(usb, "9-1", "idVendor"), "05ac\n")
+        _write(os.path.join(usb, "9-1", "product"), "iPhone\n")
+        d = hd.Daemon(tempfile.mkdtemp(), device="/gibt/es/nicht", sysusb=usb, typec=os.path.join(usb, "tc"))
+        d.cfg = dict(d.cfg, source="mobcam", enabled=True)
+
+        class Strom:
+            def __init__(self, zeilen):
+                self.z = [z.encode() + b"\n" for z in zeilen] + [b""]
+
+            async def readline(self):
+                return self.z.pop(0)
+        proc = types.SimpleNamespace(stderr=Strom(["Moblin 35.6.0 auf iPhone verbunden", "Bild: 1920x1080 HEVC"]))
+        asyncio.run(d._drain(proc))
+        self.assertEqual(d.mobcam_fmt, "1920×1080 HEVC")
+        d.proc = object()
+        asyncio.run(d.read_signal())
+        self.assertEqual(d.status()["usb"]["format"], "1920×1080 HEVC")
+        d.proc = None
+        asyncio.run(d.read_signal())
+        self.assertEqual(d.status()["usb"]["format"], "")
+
+    def test_h264_und_oberflaeche(self):
+        hd = irl("hdmi_daemon")
+        self.assertTrue(hd.MOBCAM_FORMAT_RE.match("Bild: 1280x720 H.264"))
+        self.assertIsNone(hd.MOBCAM_FORMAT_RE.match("Bild: 1280x720 VP9"))
+        with open(os.path.join(ROOT, "irl4you", "web", "neu", "views", "kameras.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("x.format || 'Moblin: Stream-Adresse mobcam://localhost:7790'", js)
+
+
 class TestMobcamBitratenSperre(unittest.TestCase):
     """Ein Strom über 12 Mbit/s wird abgelehnt, bevor er die Live-Kette erreicht (sie schafft je Strom nur etwa 13 Mbit/s)."""
 
