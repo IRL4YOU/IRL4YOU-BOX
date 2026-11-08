@@ -176,6 +176,8 @@ class _NoAuthOnForeignRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class Updater:
+    ci_pending = False      # der letzte Stand wartet nur noch auf die grünen Prüfungen bei GitHub
+
     def __init__(self, cfg, now=time.time, sleep=time.sleep):
         self.cfg = cfg
         self.now = now
@@ -785,11 +787,13 @@ class Updater:
         """(Commit, Hinweistext) des Zweigspitzenstands, wenn er neu und freigegeben ist, sonst (None, Grund)."""
         tip, cur = commits[0], self.active_commit()
         name = name or short(tip["sha"])
+        self.ci_pending = False
         if cur == tip["sha"]:
             return None, "IRL4YOU ist aktuell."
         if self.cfg.require_ci:
             st = self.ci_state(tip)
             if st == "pending":
+                self.ci_pending = True
                 return None, "Neue Version %s wird noch von GitHub geprüft." % name
             if st == "failed":
                 return None, "Neue Version %s hat fehlgeschlagene Prüfungen und wird nicht installiert." % name
@@ -808,7 +812,7 @@ class Updater:
             lines = clean_message(c["message"]).splitlines()
             notes.append("- " + lines[0] if lines else "- (ohne Text)")
         self.status(state="idle", step="", version=self.label(self.active_id()), commit=(cur or "")[:12],
-                    latest=short(commits[0]["sha"]), latest_version=labels[0], available=bool(tip), checked=int(self.now()),
+                    latest=short(commits[0]["sha"]), latest_version=labels[0], available=bool(tip), pending=bool(self.ci_pending and not tip), checked=int(self.now()),
                     notes="\n".join(notes)[:4000] if tip else "",
                     releases=[{"version": short(c["sha"]), "label": labels[i], "commit": c["sha"], "published": c["date"], "prerelease": False,
                                "notes": clean_message(c["message"])[:4000]} for i, c in enumerate(commits)],
