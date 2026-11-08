@@ -38,7 +38,7 @@
         while (Date.now() < end && (d.checked_at || 0) === t0 && d.state !== 'installing') { await sleep(1500); d = await api('GET', '/api/swupdate'); App.set('swupdate', d); }
       } catch (e) { toast(e.message); } finally { swChecking = 0; swSig = ''; }
       App.set('swupdate', d);
-      toast((d.checked_at || 0) === t0 ? 'Die Prüfung hat nicht geantwortet. Bitte gleich noch einmal versuchen.' : d.newer ? 'Neue Version ' + (d.latest_version || d.latest) + ' ist verfügbar.' : d.message && !/aktuell/i.test(d.message) ? d.message : 'Du hast die neueste Version.');
+      toast((d.checked_at || 0) === t0 ? 'Die Prüfung hat nicht geantwortet. Bitte gleich noch einmal versuchen.' : d.newer ? 'Neue Version ' + (d.latest_version || d.latest) + ' ist verfügbar.' : d.pending ? 'Neue Version ' + (d.latest_version || d.latest) + ' wird noch geprüft. Das Update kommt in wenigen Minuten.' : d.message && !/aktuell/i.test(d.message) ? d.message : 'Du hast die neueste Version.');
     }
     function renderSw() {
       const d = App.data.swupdate; if (!d) return;
@@ -52,13 +52,14 @@
       dl.replaceChildren(...swVersions.filter(v => !v.current).map(v => h('option', { value: v.version }, `${v.version} · ${v.relation}${v.local ? ' · gesichert' : ''}${v.github ? ' · GitHub' : ''}${v.date ? ' · ' + v.date : ''}`)));
       let m = ''; if (!d.helper_installed) m = 'Der Update-Helfer ist nicht installiert. Bitte install.sh einmal erneut ausführen.'; else if (d.error) m = d.error; else if (busy) m = (d.state === 'installing' ? 'Das Update läuft' : 'Update wird gestartet') + ' … Die Seite lädt danach von selbst neu.';
       else if (d.state === 'done' || d.state === 'rolledback' || d.state === 'refused' || d.state === 'failed') m = d.message; else if (d.sending && d.newer) m = 'Update gesperrt: Es wird gerade gesendet.'; else if (d.newer && d.bridge) m = 'Die Testphase ist beendet: Dieses Update führt zurück auf die stabile Version. Installieren geht nur, wenn nicht gesendet wird.'; else if (d.newer) m = 'Eine neue Version ist da. Installieren geht nur, wenn nicht gesendet wird.';
+      else if (d.pending) m = 'Neue Version ' + (d.latest_version || d.latest) + ' wird noch von GitHub geprüft. Das Update kommt in wenigen Minuten.';
       else if (d.latest) m = 'Du hast die neueste Version.' + (d.checked_at ? ` Zuletzt geprüft um ${ftime(d.checked_at)}.` : '');
       if (swChecking && !busy) m = 'Suche nach Updates …';
       swMsg.set(m, (d.state === 'failed' || d.error) && !swPending ? 'bad' : '');
       const x = () => swVersions.find(v => v.version === verInput.value.trim().replace(/^v/, ''));
       const showInfo = () => { const raw = verInput.value.trim(), v = x(); verInfo.textContent = !raw ? (swVersions.length > 1 ? 'Verfügbar: ' + swVersions.filter(q => !q.current).slice(0, 6).map(q => q.version + (q.relation === 'älter' ? ' (älter)' : ' (neuer)')).join(', ') + '.' : 'Es sind noch keine anderen Versionen gesichert oder veröffentlicht.') : (!v || v.current) ? (v && v.current ? 'Diese Version ist schon installiert.' : 'Diese Version kennt die Box nicht (weder gesichert noch auf GitHub veröffentlicht).') : `Version ${v.version}: ${v.relation}${v.local ? ', lokal gesichert (sofort verfügbar)' : ''}${v.github ? ', auf GitHub veröffentlicht' : ''}${v.date ? ', ' + v.date : ''}.`; }; verInput.oninput = showInfo; showInfo();
       swBox.replaceChildren(card({ title: 'Software-Update (IRL4YOU BOX)', sub: 'Holt neue Versionen dieser Software aus dem Repository auf GitHub. Kameras, Server und Einstellungen bleiben erhalten. Nicht während einer Übertragung.',
-        actions: [busy ? badge('läuft …', 'accent') : d.error ? badge('unbekannt') : d.newer ? badge('Update verfügbar', 'accent') : d.channel === 'test' ? badge('Testversion', 'warn') : badge('aktuell', 'ok')], body: [
+        actions: [busy ? badge('läuft …', 'accent') : d.error ? badge('unbekannt') : d.newer ? badge('Update verfügbar', 'accent') : d.pending ? badge('kommt gleich', 'accent') : d.channel === 'test' ? badge('Testversion', 'warn') : badge('aktuell', 'ok')], body: [
         kv('Installiert', 'v' + d.current + (d.stage ? ' (' + d.stage + ')' : '')), kv('Neueste auf GitHub', d.latest ? 'v' + (d.latest_version || d.latest) : (d.error ? '–' : 'wird geprüft …')),
         d.newer && d.notes ? md(d.notes) : null, busy ? prog(d.progress || 0, d.step || 'Update wird gestartet') : null, swMsg,
         h('div', { class: 'cluster' }, btn('Nach Updates suchen', { size: 'sm', ico: 'refresh', disabled: busy, run: swCheck }),
