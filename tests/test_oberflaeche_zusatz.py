@@ -137,6 +137,19 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertIn("placeholder: 'Suchen …'", sysjs)                                  # kleines Suchfeld, ohne Beschriftung davor
         self.assertNotIn("field({ label: 'Suchen', control: histQ })", sysjs)
 
+    def test_reiter_box_reihenfolge(self):
+        # 1. Box aus-/neu starten, 2. Passwort ändern, 3. Aussehen; die Karte zeichnet sich nur bei Änderung neu
+        sysjs = _read(os.path.join(WEB, "neu", "views", "system.js"))
+        self.assertIn("boxBox.append(powSlot, pwSlot, look);", sysjs)
+        self.assertIn("powSlot.replaceChildren(card({ title: 'Box ausschalten und abmelden'", sysjs)
+        self.assertIn("if (sgP === powSig) return;", sysjs)
+        self.assertNotIn("boxBox.replaceChildren(", sysjs)
+        box = _read(os.path.join(WEB, "neu", "views", "mehr-box.js"))
+        self.assertIn("panel('sy-box-pw')", box)
+        self.assertEqual(box.count("title: 'Passwort ändern'"), 2)
+        self.assertNotIn("title: 'Passwort der Oberfläche'", box)
+        self.assertIn("id: 'sy-box-pw'", sysjs)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
