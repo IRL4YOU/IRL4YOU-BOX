@@ -38,6 +38,7 @@ SYS_TYPEC = "/sys/class/typec"
 APPLE_VENDOR = "05ac"
 MOBCAM_HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobcam_rtmp.py")
 MOBCAM_WAIT = "Warte auf Moblin"
+MOBCAM_FORMAT_RE = re.compile(r"^Bild: (\d+)x(\d+) (HEVC|H\.264)$")      # Zeile des Hilfsprogramms, sobald Moblin Bild liefert
 MOBCAM_TOO_HIGH = "Die Bitrate der Mobcam ist zu hoch. Bitte in Moblin höchstens 10 Mbit/s einstellen."
 MOBCAM_PHONE_TEXT = "Kein iPhone angeschlossen (USB-Datenkabel, iPhone entsperren, „Vertrauen“ tippen)"
 DJI_VENDOR = "2ca3"
@@ -450,6 +451,7 @@ class Daemon:
         self.dji_seen = {}
         self._probe_run = probe or self._probe_process
         self.usb = {"present": False, "name": "", "node": "", "format": "", "audio": "", "power": False}
+        self.mobcam_fmt = ""
         self.usb_choice = None
         self.usb_bad = set()
         self.usb_cur = None
@@ -599,7 +601,8 @@ class Daemon:
             phone = find_apple_phone(self.sysusb)
             if phone:
                 sig.update(plugged=True, locked=True, device="mobcam")
-            self.usb = dict(self.usb, power=False, present=bool(phone), name=phone["name"] if phone else "", node="", format="", audio="mobcam")
+            self.usb = dict(self.usb, power=False, present=bool(phone), name=phone["name"] if phone else "", node="",
+                            format=self.mobcam_fmt if phone and self.proc is not None else "", audio="mobcam")
             return sig
         loop = asyncio.get_event_loop()
         try:
@@ -621,7 +624,12 @@ class Daemon:
                 line = await proc.stderr.readline()
                 if not line:
                     break
-                self.tail.append(line.decode("utf-8", "replace").strip())
+                text = line.decode("utf-8", "replace").strip()
+                self.tail.append(text)
+                m = MOBCAM_FORMAT_RE.match(text)
+                if m:
+                    self.mobcam_fmt = "%s×%s %s" % (m.group(1), m.group(2), "HEVC" if m.group(3) == "HEVC" else "H.264")
+                    log.info("Mobcam: Bild %s", self.mobcam_fmt)
         except Exception:
             pass
 
@@ -659,6 +667,7 @@ class Daemon:
             argv = feeder_argv(self.cfg, self.rtmp_port, self.rtmp_app, self.device, self.audio_device,
                                find_extra_audio(self.cfg.get("audio"), self.asound))
         self.tail.clear()
+        self.mobcam_fmt = ""
         try:
             self.proc = await self._spawn(argv)
         except Exception as e:
@@ -671,8 +680,11 @@ class Daemon:
         self.state, self.message = "starting", ""
         if getattr(self.proc, "stderr", None) is not None:
             self._reader = asyncio.ensure_future(self._drain(self.proc))
-        log.info("Einspeisung gestartet (%s, %dx%d@%s, %d kbit/s, Schlüssel %s)", self.cfg.get("source", "hdmi"), sig.get("width") or 0, sig.get("height") or 0,
-                 sig.get("fps") or "?", self.cfg["bitrate"], self.cfg["key"])
+        if self.cfg.get("source") == "mobcam":
+            log.info("Einspeisung gestartet (mobcam: Bild und Ton unverändert, Schlüssel %s)", self.cfg["key"])
+        else:
+            log.info("Einspeisung gestartet (%s, %dx%d@%s, %d kbit/s, Schlüssel %s)", self.cfg.get("source", "hdmi"), sig.get("width") or 0, sig.get("height") or 0,
+                     sig.get("fps") or "?", self.cfg["bitrate"], self.cfg["key"])
 
     async def _stop(self):
         proc, self.proc = self.proc, None
