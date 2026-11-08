@@ -274,6 +274,24 @@ class TestFusszeileUndLinks(unittest.TestCase):
             self.assertIn(rule, css[:i], rule)
             self.assertNotIn(rule, css[i:], rule)
 
+    def test_live_karten_zeichnen_sich_nur_bei_aenderung_neu(self):
+        # sonst flackert die Seite: zufällige Kennungen zählen nicht als Änderung, laufende Zahlen werden nachgetragen, der Chat schreibt nur bei Änderung
+        live = _read(os.path.join(WEB, "neu", "views", "live.js"))
+        self.assertIn("const sigOf = nodes =>", live)
+        self.assertIn("const hsg = sigOf(kids)", live)
+        self.assertIn("const setLive = (box, nodes) =>", live)
+        self.assertIn("setLive(camsBody,", live)
+        self.assertIn("setLive(linesBody,", live)
+        chat = _read(os.path.join(WEB, "neu", "views", "chat.js"))
+        self.assertIn("if (msg.textContent !== mt) msg.textContent = mt;", chat)
+        self.assertIn("if (statusEl.__k !== d.state)", chat)
+        self.assertIn("checked_at: Math.floor((d.checked_at || 0) / 60)", _read(os.path.join(WEB, "neu", "views", "system.js")))
+        wlan = _read(os.path.join(WEB, "neu", "views", "wlan.js"))
+        self.assertIn("App.on('srtla', render);", wlan)
+        self.assertNotIn("App.on('srtla', () => { sig = ''", wlan)
+        kam = _read(os.path.join(WEB, "neu", "views", "kameras.js"))
+        self.assertIn("if (subP.textContent !== subT) subP.textContent = subT;", kam)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
