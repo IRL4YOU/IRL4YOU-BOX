@@ -127,6 +127,16 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertIn('"pending": bool(latest and chk.get("pending") and not chk.get("available"))', up)
         self.assertIn("PENDING_WAIT", up)
 
+    def test_aenderungsliste_steckt_in_der_update_karte(self):
+        # kein zweiter Rahmen "Änderungen" unter der Update-Karte: "Alle Änderungen" klappt in der Karte selbst auf
+        sysjs = _read(os.path.join(WEB, "neu", "views", "system.js"))
+        self.assertNotIn("histCard", sysjs)
+        self.assertNotIn("title: 'Änderungen'", sysjs)
+        self.assertIn("verInfo), hist] }));", sysjs)
+        self.assertIn("btn('Alle Änderungen', { size: 'sm', ico: 'down'", sysjs)       # Knopf mit Rahmen wie die anderen Knöpfe der Karte
+        self.assertIn("placeholder: 'Suchen …'", sysjs)                                  # kleines Suchfeld, ohne Beschriftung davor
+        self.assertNotIn("field({ label: 'Suchen', control: histQ })", sysjs)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
