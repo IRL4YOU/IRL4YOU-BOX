@@ -4,7 +4,13 @@
   const { h, ico, fmt, dur, api, App, poll, ask, toast, run, badge, btn, alertBox, card, row, list, sw, pageHead, view, $, kv, prog, disclosure, note } = Neu;
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* privat */ } return null; };
   /* Nur neu zeichnen, wenn sich der Inhalt wirklich geändert hat (sonst flackern Karten bei jeder Abfrage, und Knöpfe werden mitten im Klick ausgetauscht) */
-  const setIf = (box, nodes) => { const flat = [].concat(nodes).flat(3).filter(Boolean); const sg = flat.map(n => n.outerHTML !== undefined ? n.outerHTML : n.textContent).join(''); if (box.__sg === sg) return; box.__sg = sg; box.replaceChildren(...flat); };
+  /* Vergleichswert eines Aufbaus: Schalter und Felder bekommen bei jedem Aufbau eine neue zufällige Kennung; ohne sie zu ignorieren wäre jeder Aufbau "neu" und die Karte flackert */
+  const sigOf = nodes => [].concat(nodes).flat(3).filter(Boolean).map(n => n.outerHTML !== undefined ? n.outerHTML : n.textContent).join('').replace(/\b(id|for|aria-labelledby|aria-controls|aria-describedby)="(sw|f|r)[a-z0-9]{6}"/g, '$1="#"');
+  /* Zeilen mit laufenden Zahlen (Leitungen, Kameras): ändert sich nur der Text, wird er an Ort und Stelle nachgetragen; nur bei anderem Aufbau wird neu gebaut. Die Zeilen haben keine Knöpfe mit eigener Logik. */
+  const skelOf = nodes => [].concat(nodes).flat(3).filter(Boolean).map(n => n.outerHTML !== undefined ? n.outerHTML.replace(/>[^<]+</g, '><') : '').join('').replace(/\b(id|for|aria-labelledby|aria-controls|aria-describedby)="(sw|f|r)[a-z0-9]{6}"/g, '$1="#"');
+  const patchText = (o, n) => { const oc = o.childNodes, nc = n.childNodes; for (let i = 0; i < nc.length && i < oc.length; i++) { if (nc[i].nodeType === 3) { if (oc[i].nodeValue !== nc[i].nodeValue) oc[i].nodeValue = nc[i].nodeValue; } else if (nc[i].nodeType === 1) patchText(oc[i], nc[i]); } };
+  const setLive = (box, nodes) => { const flat = [].concat(nodes).flat(3).filter(Boolean), sk = skelOf(flat); if (box.__sk === sk && box.childNodes.length === flat.length) { flat.forEach((n, i) => patchText(box.childNodes[i], n)); return; } box.__sk = sk; box.__sg = ''; box.replaceChildren(...flat); };
+  const setIf = (box, nodes) => { const flat = [].concat(nodes).flat(3).filter(Boolean); const sg = sigOf(flat); if (box.__sg === sg) return; box.__sg = sg; box.replaceChildren(...flat); };
   const LABEL = { starting: 'Startet …', restarting: 'Verbindung wird neu aufgebaut …', stopping: 'Wird beendet …', refused: 'Nicht gestartet' };
 
   view('live', sec => {
@@ -263,7 +269,7 @@
           sw({ s: 'Automatisch starten', k: 'autostart kamera sendet live', checked: a.enabled, label: 'Automatisch starten, sobald eine Kamera sendet', hint: a.phase === 'wartet' ? (a.until ? `Wartet auf eine sendende Kamera (bis ${Neu.ftime(a.until)} Uhr)` : 'Wartet auf eine sendende Kamera') : (a.phase === 'aufgegeben' || a.phase === 'abgebrochen') && a.message ? a.message : 'Gilt nur nach dem Hochfahren der Box, einmal pro Start: Sobald eine Kamera sendet (die Box wartet bis zu 10 Minuten darauf), geht sie von selbst live. „Stop“ bricht die Automatik für diesen Start ab. Verbraucht Mobilfunkdaten.',
             onchange: (on, el) => run(el, () => api('POST', '/api/autostart', { enabled: on })) })));
       }
-      const hsg = kids.map(n => n.outerHTML !== undefined ? n.outerHTML : n.textContent).join('') + '|' + JSON.stringify((s.autostart || {}).enabled);
+      const hsg = sigOf(kids) + '|' + JSON.stringify((s.autostart || {}).enabled);
       if (hero.__sg === hsg) { const cur = hero.querySelector('[data-sub]'); if (cur && cur.textContent !== (sub || '')) cur.textContent = sub || ''; }       // nur die Zeitangabe nachtragen
       else { hero.__sg = hsg; const se = kids[0].querySelector('[data-sub]'); if (se) se.textContent = sub || ''; hero.replaceChildren(...kids); }
       /* Neustart nötig? */
@@ -315,7 +321,7 @@
         return row({ icon: o.iface.startsWith('wlan') ? 'wifi' : 'ethernet', title: (sr.conn_names || {})[o.iface] ? `${o.label} (${sr.conn_names[o.iface]})` : o.label,
           desc: d ? d.text : `${fmt((net[o.iface] || {}).tx_mbit)} Mbit/s hoch · ${fmt((net[o.iface] || {}).rx_mbit)} Mbit/s runter`, end: badge(d && d.level !== 'bad' ? 'Prüfen' : label, tone) });
       });
-      setIf(linesBody, rows.length ? list(rows) : h('div', { class: 'empty' }, h('span', { text: 'Keine Leitung zum Senden gewählt.' }), h('a', { class: 'btn', href: '#netz', data: { size: 'sm', viewLink: 'netz' }, text: 'Leitungen wählen' })));
+      setLive(linesBody, rows.length ? list(rows) : h('div', { class: 'empty' }, h('span', { text: 'Keine Leitung zum Senden gewählt.' }), h('a', { class: 'btn', href: '#netz', data: { size: 'sm', viewLink: 'netz' }, text: 'Leitungen wählen' })));
     }
 
     const ROLE = { main: 'Hauptbild', pip: 'Bild in Bild', extra: 'Weitere' };
@@ -329,7 +335,7 @@
         const bits = [ROLE[c.role] || '', live && c.fps ? `${fmt(c.fps, 0)} fps` : '', live && c.mbit ? `${fmt(c.mbit)} Mbit/s` : '', pic, c.battery != null ? `Akku ${c.battery} %${c.charging ? ' (lädt)' : ''}` : ''].filter(Boolean).join(' · ');
         return row({ icon: 'camera', title: c.name || c.key, desc: bits, end: badge(label, tone) });
       });
-      setIf(camsBody, rows.length ? list(rows) : h('div', { class: 'empty' }, h('span', { text: 'Noch keine Kamera.' }), h('a', { class: 'btn', href: '#kameras', data: { size: 'sm', viewLink: 'kameras' }, text: 'Kamera hinzufügen' })));
+      setLive(camsBody, rows.length ? list(rows) : h('div', { class: 'empty' }, h('span', { text: 'Noch keine Kamera.' }), h('a', { class: 'btn', href: '#kameras', data: { size: 'sm', viewLink: 'kameras' }, text: 'Kamera hinzufügen' })));
     }
 
     const USB = { wlan: 'USB-WLAN-Adapter getrennt', bt: 'USB-Bluetooth-Adapter getrennt', net: 'USB-Router getrennt', cam: 'USB-Kamera getrennt', other: 'USB-Gerät getrennt' };

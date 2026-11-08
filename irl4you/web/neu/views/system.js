@@ -45,7 +45,7 @@
       if (swFirst === null) swFirst = d.current; const installing = d.state === 'installing'; if (installing) { swSaw = true; if (!swPending) { swPending = Date.now(); window.pbUpdating = swPending; } }
       if (swFirst !== d.current && !installing) { swFinish(d.current); return; }
       if (swPending) { const age = Date.now() - swPending; if ((d.state === 'done' || (d.state === 'rolledback' && swFirst !== d.current)) && (swSaw || age > 25000)) { swFinish(d.current); return; } if (age > 10000 && SW_TERMINAL.includes(d.state)) { swPending = 0; window.pbUpdating = 0; } else if (age > 900000) { swPending = 0; window.pbUpdating = 0; } }
-      const sg = JSON.stringify([d, swPending, histSecs && 1]); if (sg === swSig) return; if (swBox.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; swSig = sg;
+      const sg = JSON.stringify([Object.assign({}, d, { checked_at: Math.floor((d.checked_at || 0) / 60) }), swPending, histSecs && 1]);       /* die Prüfzeit steht nur auf die Minute genau da: nicht bei jeder Sekunde neu zeichnen */ if (sg === swSig) return; if (swBox.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; swSig = sg;
       const busy = installing || !!swPending; swVersions = d.versions || []; swCur = d.current; window.swCurVer = d.current;
       document.getElementById('ver').textContent = 'Version ' + d.current + (d.stage ? ' (' + d.stage + ')' : '');
       swNewer = !!d.newer; navDot();

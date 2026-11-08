@@ -184,10 +184,10 @@
         if (near) { if (!box.querySelector('.mrow')) box.scrollTop = box.scrollHeight; } else if (keepTop) box.scrollTop = box.scrollHeight - keepTop;
         if (evNew) { if (!near) evchip.hidden = false; evSignal(); }
         const text = { 'kein-kanal': 'Kein Kanal eingetragen. Unter System > Chat und Deck eintragen.', verbinde: 'Verbinde …', fehler: 'Keine Verbindung zu Twitch.', aus: 'Kein Chat eingeschaltet. Unter ⚙ oder System > Chat und Deck einschalten.' }[d.state] || '';
-        msg.textContent = (d.state === 'ok' && !shown) ? 'Noch keine Nachrichten.' : text;
-        statusEl.replaceChildren(d.state === 'ok' ? badge('Verbunden', 'ok') : badge(d.state === 'aus' ? 'Aus' : d.state === 'kein-kanal' ? 'Nicht eingerichtet' : d.state === 'verbinde' ? 'Verbindet …' : 'Getrennt', d.state === 'fehler' ? 'danger' : undefined));
+        const mt = (d.state === 'ok' && !shown) ? 'Noch keine Nachrichten.' : text; if (msg.textContent !== mt) msg.textContent = mt;       // nur bei Änderung schreiben, sonst flackert die Karte bei jeder Abfrage
+        if (statusEl.__k !== d.state) { statusEl.__k = d.state; statusEl.replaceChildren(d.state === 'ok' ? badge('Verbunden', 'ok') : badge(d.state === 'aus' ? 'Aus' : d.state === 'kein-kanal' ? 'Nicht eingerichtet' : d.state === 'verbinde' ? 'Verbindet …' : 'Getrennt', d.state === 'fehler' ? 'danger' : undefined)); }
         form.hidden = !(d.account && d.account.state === 'angemeldet' && (!d.sources || d.sources.twitch !== false));
-      } catch (e) { if (Date.now() - lastOk > 10000) { msg.textContent = 'Keine Verbindung zur Box.'; statusEl.replaceChildren(badge('Getrennt', 'danger')); } }
+      } catch (e) { if (Date.now() - lastOk > 10000) { msg.textContent = 'Keine Verbindung zur Box.'; statusEl.__k = 'getrennt'; statusEl.replaceChildren(badge('Getrennt', 'danger')); } }
       finally { busy = false; }
     }
     const txt = h('input', { class: 'input', placeholder: 'Nachricht schreiben', maxlength: 500, autocomplete: 'off', 'aria-label': 'Nachricht' }), sendB = btn('Senden', { variant: 'primary' }); sendB.type = 'submit';

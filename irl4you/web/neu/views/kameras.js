@@ -160,7 +160,7 @@
       const cams = (m.cameras || []).filter(c => c.key !== 'hdmi');
       const sg = JSON.stringify([cams.map(c => [c.id, c.name, c.role, c.state, c.parked, c.iface, c.url, c.via, c.in_pips, c.is_main, c.auto, (c.key || '').startsWith('dji-') ? null : c.battery != null]), djs.map(d => [d.addr, d.state, d.battery != null, d.charging, d.detail, d.wifi_ifname, d.switch_wait > 0, d.publishing, d.saved, d.ssid, d.autoconnect, d.battery_age > 600, !!d.retry_in, d.in_range]), netOpts().map(o => o.iface), App.data.dji && App.data.dji.wifi_options]);
       const n = cams.length, live = cams.filter(c => c.state === 'live').length;
-      subP.textContent = `${n} ${n === 1 ? 'Quelle' : 'Quellen'} · ${live} senden gerade`;
+      const subT = `${n} ${n === 1 ? 'Quelle' : 'Quellen'} · ${live} senden gerade`; if (subP.textContent !== subT) subP.textContent = subT;
       const bad = djs.some(d => d.state === 'error'), nd = document.getElementById('nd-kameras'); nd.hidden = !bad; nd.dataset.tone = 'danger';
       if (sg === sig) { if (grid.children.length === cams.length) cams.forEach((c, k) => patchCard(grid.children[k], c, c.key && c.key.startsWith('dji-') ? djiOf(c) : null)); return; }
       if (grid.contains(document.activeElement) && document.activeElement.tagName !== 'BUTTON') return; sig = sg;

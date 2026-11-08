@@ -103,6 +103,6 @@
     else { kids.push(...d.cards.map(c => cardFor(c, busy, ups))); kids.push(connectCard(d, busy)); }
     box.replaceChildren(...kids);
   }
-  App.on('wifi', render); App.on('srtla', () => { sig = ''; render(); });
+  App.on('wifi', render); App.on('srtla', render);       // die Vergleichsprüfung enthält die gewählten Leitungen schon; sie bei jeder Abfrage zu löschen ließ die Seite dauernd neu zeichnen
   document.addEventListener('neu:tab', () => { sig = ''; });
 })();
