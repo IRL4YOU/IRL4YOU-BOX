@@ -30,6 +30,7 @@
       if (st) kids.push(h('p', { style: `font-size:var(--text-sm);color:${st[1] === 'ok' ? 'var(--ok)' : st[1] === 'bad' ? 'var(--danger)' : st[1] === 'warn' ? 'var(--warn)' : 'var(--text-2)'}`, text: st[0] }));
       if (st && c.state === 'ok' && c.title && o.showTitle) kids.push(kv('Stream', c.title));
       if (d.handle && c.error) kids.push(h('p', { class: 'muted', style: 'font-size:var(--text-sm)', text: c.error, translate: 'no' }));
+      const sg = JSON.stringify([d.handle, c.state, c.title, c.error]); if (sg === status.__sg) return; status.__sg = sg;       // nur bei Änderung neu bauen
       status.replaceChildren(...kids);
     }
     App.on(o.key, render);

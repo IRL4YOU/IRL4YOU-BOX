@@ -53,7 +53,7 @@
   }
 
   function render() {
-    const d = App.data.dji; if (!d) return; const sg = JSON.stringify([d, App.data.btdriver, ctAll]); if (sg === sig) return; sig = sg;
+    const d = App.data.dji; if (!d) return; const sg = Neu.stable([d, App.data.btdriver, ctAll]); if (sg === sig) return; sig = sg;
     if (box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT' && document.activeElement.type !== 'checkbox') return;
     box.replaceChildren(adapterCard(d), phoneCard(d), ctrlCard(d));
   }

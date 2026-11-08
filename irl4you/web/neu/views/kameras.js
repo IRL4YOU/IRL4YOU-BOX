@@ -186,11 +186,12 @@
     const scanBtn = btn('Nach DJI-Kameras suchen', { ico: 'bluetooth', onclick: async () => { await djiCmd({ cmd: 'scan' }); } }), scanList = h('div'), djiNote = h('p', { class: 'muted', style: 'font-size:var(--text-sm)' }), adaptNote = h('p', { class: 'muted', style: 'font-size:var(--text-sm)' });
     function renderScan() {
       const d = App.data.dji; if (!d) return;
-      if (!d.available) { djiNote.textContent = d.reason || 'Bluetooth nicht verfügbar'; djiNote.style.color = 'var(--danger)'; scanBtn.disabled = true; scanList.replaceChildren(); return; }
+      if (!d.available) { djiNote.textContent = d.reason || 'Bluetooth nicht verfügbar'; djiNote.style.color = 'var(--danger)'; scanBtn.disabled = true; scanList.__sg = ''; scanList.replaceChildren(); return; }
       djiNote.textContent = d.bleak === false ? 'Die Bluetooth-Bibliothek (bleak) ist nicht installiert. install.sh erneut ausführen (braucht Internet).' : (d.scan_error || ''); djiNote.style.color = djiNote.textContent ? 'var(--danger)' : '';
       const pr = (d.adapter_problems || []).map(x => x.hint), ad = d.adapters || [], dr = d.driver || {}, drTxt = dr.message && ['working', 'waiting', 'failed', 'unsupported'].includes(dr.state) ? dr.message : '';
       adaptNote.textContent = pr.length && !drTxt ? pr.join(' ') : pr.length ? drTxt : (ad.length ? '' : 'Kein Bluetooth-Adapter gefunden. ') + drTxt; adaptNote.style.color = (pr.length || !ad.length || dr.state === 'failed' || dr.state === 'unsupported') ? 'var(--danger)' : '';
       scanBtn.disabled = !!d.scanning; scanBtn.replaceChildren(Neu.ico('bluetooth', 'sm'), d.scanning ? 'Suche läuft …' : 'Nach DJI-Kameras suchen');
+      const scSig = JSON.stringify(d.scan || []); if (scSig === scanList.__sg) return; scanList.__sg = scSig;       // nur bei Änderung neu bauen
       scanList.replaceChildren(...(d.scan || []).map(r => row({ icon: 'camera', title: r.name, desc: `${r.model} · ${r.addr} · ${r.rssi} dBm`, end: r.paired ? badge('hinzugefügt') : btn('Hinzufügen', { size: 'sm', variant: 'primary', run: async () => { if (await djiCmd({ cmd: 'add', addr: r.addr, name: r.name, model: r.model, kind: r.kind })) { App.data['metrics:refresh'](); toast('Kamera hinzugefügt'); } } }) })).map(r => list(r)));
     }
     App.on('dji', renderScan);

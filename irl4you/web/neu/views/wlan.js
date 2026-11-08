@@ -88,7 +88,7 @@
   function render() {
     const d = App.data.wifi; if (!d) return;
     const busy = !d.helper_installed || d.state === 'working';
-    const sg = JSON.stringify([d, [...Object.keys(open)].map(k => open[k]), App.data.srtla && App.data.srtla.settings.uplinks]); if (sg === sig) return;
+    const sg = Neu.stable([d, [...Object.keys(open)].map(k => open[k]), App.data.srtla && App.data.srtla.settings.uplinks]); if (sg === sig) return;
     if (box.contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return; sig = sg;
     const ups = (App.data.srtla && App.data.srtla.settings.uplinks) || [];
     const kids = [];
