@@ -133,7 +133,7 @@ def main():
     signal.signal(signal.SIGTERM, lambda *_: (kill_all(), sys.exit(0)))
     signal.signal(signal.SIGINT, lambda *_: (kill_all(), sys.exit(0)))
     if not os.path.exists(MOBCAM_BIN):
-        die(3, "Mobcam ist nicht eingerichtet (sudo bash /opt/pipbox/install/mobcam/mobcam-setup.sh)")
+        die(3, "Mobcam ist noch nicht eingerichtet (das macht das nächste Update, Protokoll: /var/log/irl4you-mobcam-setup.log)")
     subprocess.run(["modprobe", "-q", "v4l2loopback"], check=False)
     subprocess.run(["modprobe", "-q", "snd-aloop"], check=False)
     node = find_node()
