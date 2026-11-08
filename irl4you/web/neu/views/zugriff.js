@@ -10,6 +10,7 @@
 
   function renderUa() {
     const d = App.data.uiaccess; if (!d) return; const l = d.client_wifi || [];
+    const sg = JSON.stringify(d); if (sg === uaCard.__sg) return; uaCard.__sg = sg;       // nur bei Änderung neu bauen
     uaCard.replaceChildren(card({ title: 'Zugriff auf diese Oberfläche', body: [
       sw({ checked: !!d.block_client_wifi, label: 'Über fremde WLANs sperren', s: 'Über fremde WLANs sperren', k: 'zugriff sperren gast wlan http oberfläche', onchange: (v, el) => run(el, async () => { try { App.set('uiaccess', await api('POST', '/api/uiaccess', { block_client_wifi: v })); } catch (x) { el.checked = !v; throw x; } }) }),
       h('p', { class: 'field__hint', text: 'Die Oberfläche ist unverschlüsselt (HTTP). In einem WLAN, in dem die Box nur Gast ist (Hotel, Handy-Hotspot, fremdes Netz), kann dort jeder mitlesen. Ist der Schalter an, antwortet die Box in solchen WLANs nicht. Erreichbar bleiben Ethernet, der Hotspot der Box, USB und Tailscale (HTTPS). Wer sich aussperrt, schaltet den Schalter über Ethernet oder Tailscale wieder aus.' }),

@@ -190,7 +190,7 @@
       djiNote.textContent = d.bleak === false ? 'Die Bluetooth-Bibliothek (bleak) ist nicht installiert. install.sh erneut ausführen (braucht Internet).' : (d.scan_error || ''); djiNote.style.color = djiNote.textContent ? 'var(--danger)' : '';
       const pr = (d.adapter_problems || []).map(x => x.hint), ad = d.adapters || [], dr = d.driver || {}, drTxt = dr.message && ['working', 'waiting', 'failed', 'unsupported'].includes(dr.state) ? dr.message : '';
       adaptNote.textContent = pr.length && !drTxt ? pr.join(' ') : pr.length ? drTxt : (ad.length ? '' : 'Kein Bluetooth-Adapter gefunden. ') + drTxt; adaptNote.style.color = (pr.length || !ad.length || dr.state === 'failed' || dr.state === 'unsupported') ? 'var(--danger)' : '';
-      scanBtn.disabled = !!d.scanning; scanBtn.replaceChildren(Neu.ico('bluetooth', 'sm'), d.scanning ? 'Suche läuft …' : 'Nach DJI-Kameras suchen');
+      scanBtn.disabled = !!d.scanning; const scT = d.scanning ? 'Suche läuft …' : 'Nach DJI-Kameras suchen'; if (scanBtn.__t !== scT) { scanBtn.__t = scT; scanBtn.replaceChildren(Neu.ico('bluetooth', 'sm'), scT); }       // nur bei Änderung neu bauen
       const scSig = JSON.stringify(d.scan || []); if (scSig === scanList.__sg) return; scanList.__sg = scSig;       // nur bei Änderung neu bauen
       scanList.replaceChildren(...(d.scan || []).map(r => row({ icon: 'camera', title: r.name, desc: `${r.model} · ${r.addr} · ${r.rssi} dBm`, end: r.paired ? badge('hinzugefügt') : btn('Hinzufügen', { size: 'sm', variant: 'primary', run: async () => { if (await djiCmd({ cmd: 'add', addr: r.addr, name: r.name, model: r.model, kind: r.kind })) { App.data['metrics:refresh'](); toast('Kamera hinzugefügt'); } } }) })).map(r => list(r)));
     }
