@@ -7,6 +7,7 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - Leitungstest: „Testen“ je Leitung und „Alle Leitungen testen“ (Herunterladen, Hochladen, Antwortzeit, auch während der Sendung).
 - Update-Prüfung alle 2 Stunden mit niedrigster Priorität; „Nach Updates suchen“ wartet auf das Ergebnis, auch während der Sendung.
 - Vorschau läuft flüssig, Passwortanzeige und Bluetooth-Einrichtung korrigiert.
+- Ansicht „Handy“ auch für die neue Oberfläche; Hinweis auf neue Versionen als kleiner Punkt; niedrigste Bitrate mindestens 450 kbit/s, Latenz mindestens 1000 ms.
 
 ## 0.4
 - Erste veröffentlichte Version der IRL4YOU Box: fertige Images für Orange Pi 5 Plus und Rock 5B+.
