@@ -261,7 +261,7 @@
       field({ s: 'Sprache', k: 'sprache language deutsch englisch', label: 'Sprache', hint: 'Gilt auf diesem Gerät auch für die bisherige Oberfläche.', control: (() => { const i = window.PB_I18N; const s = Neu.select((i ? i.languages() : [{ code: 'de', name: 'Deutsch' }]).map(l => [l.code, l.name]), i ? i.lang() : 'de', v => { if (i) i.set(v); }); s.setAttribute('translate', 'no'); return s; })() }),
       h('p', { class: 'field__hint', text: 'Die frühere Optik der bisherigen Oberfläche stellst du dort unter „Optionen“ ein.' }),
       h('div', { class: 'cluster' }, btn('Zur bisherigen Oberfläche wechseln', { size: 'sm', onclick: () => Neu.toOld() })), h('p', { class: 'field__hint', text: 'Das merkt sich dieser Browser. Zurück zur neuen Oberfläche geht es in der bisherigen unter „Optionen“ > „Design“.' })] });
-    boxBox.append(powSlot, pwSlot, look);       // Reihenfolge: 1. Box aus-/neu starten, 2. Passwort ändern (aus mehr-box.js), 3. Aussehen
+    boxBox.append(powSlot, pwSlot, look, h('div', { id: 'sy-box-menu' }));       // Reihenfolge: 1. Box aus-/neu starten, 2. Passwort ändern (aus mehr-box.js), 3. Aussehen, 4. Menü und Karten anpassen (anpassen.js)
     function renderPower() {
       const d = App.data.power; if (!d) return;
       const sgP = JSON.stringify(d); if (sgP === powSig) return; powSig = sgP;       // nur bei Änderung neu zeichnen, sonst flackert die Karte alle 15 s
