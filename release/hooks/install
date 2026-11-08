@@ -19,6 +19,11 @@ if [ -f install/system-install.sh ]; then
     sh install/system-install.sh
 fi
 
+# 3. Mobcam (iPhone per USB als Kamera): Pakete, Kernelmodul, Programm. Ein Fehler (z. B. kein Netz) bricht das Update nicht ab; das nächste Update versucht es wieder.
+if [ -f install/mobcam/mobcam-setup.sh ] && [ "${IRL4YOU_ACTION:-install}" != rollback ]; then
+    bash install/mobcam/mobcam-setup.sh > /var/log/irl4you-mobcam-setup.log 2>&1 || echo "Hinweis: Mobcam ist noch nicht eingerichtet, siehe /var/log/irl4you-mobcam-setup.log"
+fi
+
 systemctl daemon-reload
 systemctl enable --quiet irl4you-update.path irl4you-update-cancel.path irl4you-update-auto.timer || true
 systemctl start irl4you-update.path irl4you-update-cancel.path irl4you-update-auto.timer || true
