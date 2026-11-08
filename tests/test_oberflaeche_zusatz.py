@@ -260,6 +260,20 @@ class TestFusszeileUndLinks(unittest.TestCase):
             for k in ("Menü und Karten anpassen", "Karten ausblenden", "Alles zurücksetzen", "Immer sichtbar", "Nach oben", "Nach unten", "Anordnen"):
                 self.assertIn(k, ex, (f, k))
 
+    def test_systemdetails_hat_ueberschrift(self):
+        # die Karte hat eine eigene Überschrift (sonst findet man den Prozessor nicht), das Aufklappen heißt nur "Anzeigen"
+        live = _read(os.path.join(WEB, "neu", "views", "live.js"))
+        self.assertIn("card({ title: 'Systemdetails', sub: 'Sendung, Prozessor (jeder Kern), Temperaturen und Speicher.', body: det })", live)
+        self.assertIn("disclosure('Anzeigen', detBox)", live)
+
+    def test_listenzeilen_umbrechen_in_jeder_breite(self):
+        # Knöpfe rechts einer Zeile (zum Beispiel "Bild und Ton jetzt") dürfen nie über den Namen laufen: die Regeln gelten nicht nur am Handy
+        css = _read(os.path.join(WEB, "neu", "app.css"))
+        i = css.index("@media (max-width: 52rem)")
+        for rule in (".row { flex-wrap: wrap;", ".row__main { flex: 1 1 9rem; }", ".row__end { margin-left: auto; flex-wrap: wrap;"):
+            self.assertIn(rule, css[:i], rule)
+            self.assertNotIn(rule, css[i:], rule)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
