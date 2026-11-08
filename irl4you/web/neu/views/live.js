@@ -106,7 +106,7 @@
       let st; try { st = await api('GET', '/api/preview'); } catch (e) { st = { available: false, why: 'missing' }; }
       prevBtn.removeAttribute('aria-busy'); if (my !== prevGen) return;
       if (!st.available) return prevStop(auto && (st.why === 'off' || st.why === 'kein-bild') ? '' : (WHY[st.why] || WHY.missing));
-      prevOn = true; prevMsg.hidden = true; prevBtn.replaceChildren(ico('stop', 'sm'), 'Stopp');
+      prevOn = true; prevMsg.hidden = true; prevBtn.replaceChildren(ico('stop', 'sm'), 'Stop');
       if (st.origin === 'extern' && !auto) toast('Vorschau von außen: klein, damit der Upload für die Sendung bleibt.');
       playStream(my);
       if (!always()) prevTimer = setTimeout(() => prevStop('Die Vorschau ist nach 10 Minuten beendet.', true), Math.max(5, (st.max_seconds || 600) - 3) * 1000);
@@ -228,7 +228,7 @@
         title = running ? 'Du bist live' : (LABEL[s.state] || s.state);
         const since = s.since ? dur(Date.now() / 1000 - s.since) : null;
         sub = [since && `Seit ${since}`, s.server && s.server.name, send.send_mbps != null && `${fmt(send.send_mbps)} Mbit/s`].filter(Boolean).join(' · ');
-        action = btn(running ? 'Stopp' : 'Bitte warten', { variant: running ? 'danger' : null, size: 'lg', ico: 'stop', disabled: !running, run: async () => {
+        action = btn(running ? 'Stop' : 'Bitte warten', { variant: running ? 'danger' : null, size: 'lg', ico: 'stop', disabled: !running, run: async () => {
           await api('POST', '/api/send', { action: 'stop' }); setTimeout(() => App.data['send:refresh'] && App.data['send:refresh'](), 600);
         } });
       } else if (s.can_start) {
@@ -260,7 +260,7 @@
       if (!active) {
         const a = s.autostart || {};
         kids.push(h('div', { style: 'margin-top:var(--space-3);border-top:1px solid var(--border);padding-top:var(--space-2)' },
-          sw({ s: 'Automatisch starten', k: 'autostart kamera sendet live', checked: a.enabled, label: 'Automatisch starten, sobald eine Kamera sendet', hint: a.phase === 'wartet' ? (a.until ? `Wartet auf eine sendende Kamera (bis ${Neu.ftime(a.until)} Uhr)` : 'Wartet auf eine sendende Kamera') : (a.phase === 'aufgegeben' || a.phase === 'abgebrochen') && a.message ? a.message : 'Gilt nur nach dem Hochfahren der Box, einmal pro Start: Sobald eine Kamera sendet (die Box wartet bis zu 10 Minuten darauf), geht sie von selbst live. „Stopp“ bricht die Automatik für diesen Start ab. Verbraucht Mobilfunkdaten.',
+          sw({ s: 'Automatisch starten', k: 'autostart kamera sendet live', checked: a.enabled, label: 'Automatisch starten, sobald eine Kamera sendet', hint: a.phase === 'wartet' ? (a.until ? `Wartet auf eine sendende Kamera (bis ${Neu.ftime(a.until)} Uhr)` : 'Wartet auf eine sendende Kamera') : (a.phase === 'aufgegeben' || a.phase === 'abgebrochen') && a.message ? a.message : 'Gilt nur nach dem Hochfahren der Box, einmal pro Start: Sobald eine Kamera sendet (die Box wartet bis zu 10 Minuten darauf), geht sie von selbst live. „Stop“ bricht die Automatik für diesen Start ab. Verbraucht Mobilfunkdaten.',
             onchange: (on, el) => run(el, () => api('POST', '/api/autostart', { enabled: on })) })));
       }
       const hsg = kids.map(n => n.outerHTML !== undefined ? n.outerHTML : n.textContent).join('') + '|' + JSON.stringify((s.autostart || {}).enabled);

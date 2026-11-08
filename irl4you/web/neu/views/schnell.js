@@ -17,7 +17,7 @@
   /* Live gehen und beenden: gleiche Regeln wie der große Knopf auf der Live-Seite */
   function liveState(s) {
     const running = s.state === 'running';
-    if (s.active) return running ? { label: 'Stopp', variant: 'danger', icon: 'stop' } : { label: '…', variant: '', icon: 'live', busy: true };
+    if (s.active) return running ? { label: 'Stop', variant: 'danger', icon: 'stop' } : { label: '…', variant: '', icon: 'live', busy: true };
     return s.can_start ? { label: 'Live', variant: 'live', icon: 'play' } : { label: 'Live', variant: '', icon: 'play', dim: true };
   }
   async function goLive() {
