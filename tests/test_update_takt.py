@@ -99,6 +99,32 @@ class TestUpdateTakt(unittest.TestCase):
     def test_abgelehnte_abfrage_ist_kein_dienstfehler(self):
         self.assertIn("SuccessExitStatus=2", _text("irl4you-update-auto.service"))
 
+    def test_laufendes_update_ist_kein_dienstfehler(self):
+        # trifft die regelmäßige Prüfung auf ein laufendes Update, endet sie mit Erfolg; ein von Hand gestartetes install meldet es weiter
+        import fcntl
+        import io
+        import sys
+        import tempfile
+        from contextlib import redirect_stderr
+        sys.path.insert(0, os.path.join(ROOT, "updater"))
+        import irl4you_update as U
+        with tempfile.TemporaryDirectory() as d:
+            conf = os.path.join(d, "update.conf")
+            with open(conf, "w", encoding="utf-8") as f:
+                f.write("[update]\nstate_dir = %s\n" % os.path.join(d, "state"))
+            os.makedirs(os.path.join(d, "state"))
+            old = U.CONFIG
+            U.Config.__init__.__defaults__ = (conf, None)
+            try:
+                with open(os.path.join(d, "state", "update.lock"), "w") as held:
+                    fcntl.flock(held, fcntl.LOCK_EX)
+                    with redirect_stderr(io.StringIO()):
+                        self.assertEqual(U.main(["auto"]), 0)
+                        self.assertEqual(U.main(["request"]), 0)
+                        self.assertEqual(U.main(["install"]), 3)
+            finally:
+                U.Config.__init__.__defaults__ = (old, None)
+
     def test_prueft_nur(self):
         # Die Prüfung ruft "auto" auf; installiert wird nur mit auto_install in update.conf (Standard: aus)
         self.assertIn("ExecStart=/usr/local/sbin/irl4you-update auto", _text("irl4you-update-auto.service"))
