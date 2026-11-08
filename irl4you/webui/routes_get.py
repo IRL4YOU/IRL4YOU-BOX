@@ -23,17 +23,24 @@ PHONE_FRAME = """<!doctype html><html lang="de"><head><meta charset="utf-8"><met
 <script>try{var t=localStorage.getItem("pb_theme"),v=JSON.parse(localStorage.getItem("pb_views")||"null"),d=v&&v.mobile&&v.mobile.design;if(t==="light"||(t!=="dark"&&d==="klar"))document.body.style.background="#f1f5f9"}catch(e){}</script></body></html>"""
 
 
+def phone_frame(src):
+    """Der schmale Handy-Rahmen um eine Oberfläche (Einstellung „Handy“): src ist die Seite im Rahmen, mit app=1."""
+    return PHONE_FRAME.replace("/?app=1", src).encode("utf-8")
+
+
 class GetRoutes:
     def do_GET(self):
         self.request_read()
         path = self.path.split("?")[0]
         if (path == "/i18n.js" or path.startswith("/i18n/")) and self.i18n_file(path):
             return
-        if path in ("/", "/index.html", "/neu", "/neu/", "/neu/index.html") and "app=1" not in self.path:
+        if path in ("/", "/index.html", "/neu", "/neu/", "/neu/index.html") and ("app=1" not in self.path or path.startswith("/neu")):
+            if self.authed() and "app=1" not in self.path and self.phone_view_wanted():
+                return self.send_bytes(200, phone_frame("/neu?app=1"), "text/html; charset=utf-8")      # Ansicht „Handy“: schmaler Rahmen um die neue Oberfläche
             return self.page("neu/index.html" if self.authed() else "login.html")      # neue Oberfläche ist die Startseite
         if path in ("/alt", "/alt/", "/", "/index.html"):                               # bisherige Oberfläche (/alt oder im Rahmen mit app=1)
             if self.authed() and "app=1" not in self.path and self.phone_view_wanted():
-                return self.send_bytes(200, PHONE_FRAME.encode("utf-8"), "text/html; charset=utf-8")
+                return self.send_bytes(200, phone_frame("/?app=1"), "text/html; charset=utf-8")
             return self.page("index.html" if self.authed() else "login.html")
         if path == "/api/auth":
             out = {"configured": self.auth.configured, "mode": self.auth.mode, "authed": self.authed(), "setup": self.auth.setup_needed}
