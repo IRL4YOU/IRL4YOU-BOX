@@ -24,7 +24,8 @@ HDMI_STATUS = "/sys/kernel/debug/hdmirx/status"
 HDMI_AUDIO = "hw:CARD=rockchiphdmiin"
 KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 DEFAULTS = {"enabled": False, "key": "hdmi", "bitrate": 8000, "fps": 30, "audio": "hdmi", "source": "hdmi", "usb_format": "auto"}
-SOURCE_CHOICES = ("hdmi", "usb", "mobcam", "test")
+SOURCE_CHOICES = ("hdmi", "usb", "mobcam", "irlcam", "test")
+PHONE_SOURCES = ("mobcam", "irlcam")      # Quellen, bei denen ein Handy per USB Bild und Ton liefert (iPhone mit Moblin / Android mit der App IRL4YOU Cam)
 TEST_SIZE = (1280, 720)
 TEST_TONES = ((440, -1), (660, 1))
 TEST_LOGO = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='3' y='3' width='58' height='58' rx='14' fill='#0f172a' stroke='#22d3ee' stroke-width='4'/>"
@@ -37,8 +38,17 @@ SYS_USB = "/sys/bus/usb/devices"
 SYS_TYPEC = "/sys/class/typec"
 APPLE_VENDOR = "05ac"
 MOBCAM_HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobcam_rtmp.py")
+IRLCAM_HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "android_cam.py")
+# Hersteller-Kennungen von Android-Handys (ohne ASUS 0b05 und MediaTek 0e8d: dort melden sich auch Bluetooth- und WLAN-Sticks)
+ANDROID_VENDORS = ("04e8", "2a70", "22d9", "18d1", "2717", "12d1", "0fce", "0bb4", "1004", "05c6", "1bbb", "2d95", "2ae5", "19d2")
+IRLCAM_GAP = 8.0                             # so lange gilt das Handy als noch da, wenn es sich nach dem Umschalten in den Zubehör-Modus neu meldet
+IRLCAM_WAIT_APP = "Warte auf die App"        # Zeile des Hilfsprogramms: Handy ist verbunden, die App sendet noch nicht
+IRLCAM_WAIT_PHONE = "Warte auf das Handy"    # Zeile des Hilfsprogramms: Handy wird noch umgeschaltet
+IRLCAM_APP_TEXT = "Warte auf die App: am Handy IRL4YOU Cam öffnen (beim ersten Mal den USB-Zugriff mit „Immer“ bestätigen)"
+IRLCAM_PHONE_TEXT = "Kein Android-Handy angeschlossen (USB-Datenkabel, Handy entsperren)"
+IRLCAM_SWITCH_TEXT = "Das Handy wird für die App vorbereitet (Handy entsperren, USB-Kabel prüfen)"
 MOBCAM_WAIT = "Warte auf Moblin"
-MOBCAM_FORMAT_RE = re.compile(r"^Bild: (\d+)x(\d+) (HEVC|H\.264)$")      # Zeile des Hilfsprogramms, sobald Moblin Bild liefert
+MOBCAM_FORMAT_RE = re.compile(r"^Bild: (\d+)x(\d+) (HEVC|H\.264)(?: (\d+) fps)?\b")      # Zeile des Hilfsprogramms, sobald das Handy Bild liefert
 MOBCAM_TOO_HIGH = "Die Bitrate der Mobcam ist zu hoch. Bitte in Moblin höchstens 10 Mbit/s einstellen."
 MOBCAM_PHONE_TEXT = "Kein iPhone angeschlossen (USB-Datenkabel, iPhone entsperren, „Vertrauen“ tippen)"
 DJI_VENDOR = "2ca3"
@@ -307,8 +317,25 @@ def find_apple_phone(sysusb=SYS_USB):
     return None
 
 
-def typec_make_host(typec=SYS_TYPEC):
-    """Hängt ein Apple-Gerät am USB-C-Anschluss, auf dem die Box als Gerät arbeitet, schaltet die Box per USB-PD auf Host. True = umgeschaltet."""
+def find_android_phone(sysusb=SYS_USB):
+    """Ein am USB angeschlossenes Android-Handy (bekannter Hersteller, kein Hub), auch im Zubehör-Modus (18d1:2d00 und ähnlich)."""
+    try:
+        names = sorted(os.listdir(sysusb))
+    except OSError:
+        return None
+    for n in names:
+        if ":" in n or not re.match(r"^\d+-[\d.]+$", n):
+            continue
+        base = os.path.join(sysusb, n)
+        vid = _read(os.path.join(base, "idVendor"), 8).lower()
+        if vid in ANDROID_VENDORS and _read(os.path.join(base, "bDeviceClass"), 8) != "09":
+            return {"name": _read(os.path.join(base, "product"), 60) or "Android-Handy",
+                    "id": (vid + ":" + _read(os.path.join(base, "idProduct"), 8)).lower()}
+    return None
+
+
+def typec_make_host(typec=SYS_TYPEC, vendors=(APPLE_VENDOR,)):
+    """Hängt ein Handy (Apple oder, wenn angegeben, Android) am USB-C-Anschluss, auf dem die Box als Gerät arbeitet, schaltet die Box per USB-PD auf Host. True = umgeschaltet."""
     try:
         ports = sorted(n for n in os.listdir(typec) if re.match(r"^port\d+$", n))
     except OSError:
@@ -322,14 +349,14 @@ def typec_make_host(typec=SYS_TYPEC):
             vendor = int(ident, 16) & 0xFFFF
         except ValueError:
             continue
-        if "%04x" % vendor != APPLE_VENDOR:
+        if "%04x" % vendor not in vendors:
             continue
         try:
             with open(os.path.join(typec, p, "data_role"), "w") as f:
                 f.write("host")
         except OSError:
             continue
-        log.info("USB-C-Anschluss %s: die Box arbeitet jetzt als Host für das iPhone", p)
+        log.info("USB-C-Anschluss %s: die Box arbeitet jetzt als Host für das Handy", p)
         return True
     return False
 
@@ -341,6 +368,11 @@ def mobcam_feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, helper=MOBCA
     # Bild und Ton gehen unverändert durch (kein Kodieren): Bitrate, Bildrate und Codec (H.264 oder H.265) stellt man in Moblin ein
     return [sys.executable or "/usr/bin/python3", "-u", helper, "--key", cfg["key"], "--rtmp-port", str(rtmp_port), "--rtmp-app", rtmp_app,
             "--audio", "none" if cfg["audio"] == "none" else "mobcam"]
+
+
+def irlcam_feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, helper=IRLCAM_HELPER):
+    """Android-Handy mit der App IRL4YOU Cam: Bild und Ton kommen per USB-Zubehör-Protokoll, das Hilfsprogramm reicht sie unverändert an SRS."""
+    return mobcam_feeder_argv(cfg, rtmp_port, rtmp_app, helper=helper)
 
 
 def usb_candidates(fmt):
@@ -452,6 +484,7 @@ class Daemon:
         self._probe_run = probe or self._probe_process
         self.usb = {"present": False, "name": "", "node": "", "format": "", "audio": "", "power": False}
         self.mobcam_fmt = ""
+        self.irl_seen = None
         self.usb_choice = None
         self.usb_bad = set()
         self.usb_cur = None
@@ -511,7 +544,7 @@ class Daemon:
 
     @property
     def available(self):
-        if self.cfg.get("source") in ("usb", "mobcam", "test"):
+        if self.cfg.get("source") in ("usb", "mobcam", "irlcam", "test"):
             return True
         return os.path.exists(self.device)
 
@@ -604,6 +637,22 @@ class Daemon:
             self.usb = dict(self.usb, power=False, present=bool(phone), name=phone["name"] if phone else "", node="",
                             format=self.mobcam_fmt if phone and self.proc is not None else "", audio="mobcam")
             return sig
+        if self.cfg.get("source") == "irlcam":
+            self.signal_known = True
+            sig = parse_hdmirx_status("")
+            if self.cfg.get("enabled"):
+                typec_make_host(self.typec, ANDROID_VENDORS)
+            phone = find_android_phone(self.sysusb)
+            now = self.clock()
+            if phone:
+                self.irl_seen = (now, phone)
+            elif self.irl_seen and self.proc is not None and now - self.irl_seen[0] < IRLCAM_GAP:
+                phone = self.irl_seen[1]            # das Handy meldet sich nach dem Umschalten in den Zubehör-Modus kurz neu
+            if phone:
+                sig.update(plugged=True, locked=True, device="irlcam")
+            self.usb = dict(self.usb, power=False, present=bool(phone), name=phone["name"] if phone else "", node="",
+                            format=self.mobcam_fmt if phone and self.proc is not None else "", audio="mobcam")
+            return sig
         loop = asyncio.get_event_loop()
         try:
             text = await loop.run_in_executor(None, self._read_status)
@@ -628,8 +677,8 @@ class Daemon:
                 self.tail.append(text)
                 m = MOBCAM_FORMAT_RE.match(text)
                 if m:
-                    self.mobcam_fmt = "%s×%s %s" % (m.group(1), m.group(2), "HEVC" if m.group(3) == "HEVC" else "H.264")
-                    log.info("Mobcam: Bild %s", self.mobcam_fmt)
+                    self.mobcam_fmt = "%s×%s %s%s" % (m.group(1), m.group(2), "HEVC" if m.group(3) == "HEVC" else "H.264", " %s fps" % m.group(4) if m.group(4) else "")
+                    log.info("%s: Bild %s", "IRL4YOU Cam" if self.cfg.get("source") == "irlcam" else "Mobcam", self.mobcam_fmt)
         except Exception:
             pass
 
@@ -663,6 +712,8 @@ class Daemon:
             sig = dict(sig, width=cand[1], height=cand[2], fps=float(cand[3]), device=self.usb["node"])
         elif self.cfg.get("source") == "mobcam":
             argv = mobcam_feeder_argv(self.cfg, self.rtmp_port, self.rtmp_app)
+        elif self.cfg.get("source") == "irlcam":
+            argv = irlcam_feeder_argv(self.cfg, self.rtmp_port, self.rtmp_app)
         else:
             argv = feeder_argv(self.cfg, self.rtmp_port, self.rtmp_app, self.device, self.audio_device,
                                find_extra_audio(self.cfg.get("audio"), self.asound))
@@ -680,8 +731,8 @@ class Daemon:
         self.state, self.message = "starting", ""
         if getattr(self.proc, "stderr", None) is not None:
             self._reader = asyncio.ensure_future(self._drain(self.proc))
-        if self.cfg.get("source") == "mobcam":
-            log.info("Einspeisung gestartet (mobcam: Bild und Ton unverändert, Schlüssel %s)", self.cfg["key"])
+        if self.cfg.get("source") in PHONE_SOURCES:
+            log.info("Einspeisung gestartet (%s: Bild und Ton unverändert, Schlüssel %s)", self.cfg["source"], self.cfg["key"])
         else:
             log.info("Einspeisung gestartet (%s, %dx%d@%s, %d kbit/s, Schlüssel %s)", self.cfg.get("source", "hdmi"), sig.get("width") or 0, sig.get("height") or 0,
                      sig.get("fps") or "?", self.cfg["bitrate"], self.cfg["key"])
@@ -746,7 +797,7 @@ class Daemon:
         if self.signal_known and not sig["locked"]:
             if running:
                 await self._stop()
-            self.state, self.message, self.fails = "waiting", (self._usb_waiting_message() if self.cfg.get("source") == "usb" else MOBCAM_PHONE_TEXT if self.cfg.get("source") == "mobcam" else "Kein HDMI-Signal"), 0
+            self.state, self.message, self.fails = "waiting", (self._usb_waiting_message() if self.cfg.get("source") == "usb" else MOBCAM_PHONE_TEXT if self.cfg.get("source") == "mobcam" else IRLCAM_PHONE_TEXT if self.cfg.get("source") == "irlcam" else "Kein HDMI-Signal"), 0
             return
         if running:
             if self.signal_known and signal_id(sig) != self.sig_at_start:
@@ -774,6 +825,10 @@ class Daemon:
         if self.cfg.get("source") == "mobcam" and self.tail and MOBCAM_WAIT in self.tail[-1]:
             self.started = now
             self.state, self.message, self.missing_since = "starting", MOBCAM_WAIT + " (Stream-Adresse mobcam://localhost:7790)", None
+            return
+        if self.cfg.get("source") == "irlcam" and self.tail and self.tail[-1].startswith((IRLCAM_WAIT_APP, IRLCAM_WAIT_PHONE)):
+            self.started = now
+            self.state, self.message, self.missing_since = "starting", (IRLCAM_APP_TEXT if self.tail[-1].startswith(IRLCAM_WAIT_APP) else IRLCAM_SWITCH_TEXT), None
             return
         if pub is None:
             if age >= 5:
@@ -809,9 +864,9 @@ class Daemon:
         if cmd == "set":
             new = clean_settings(req.get("settings"), self.cfg)
             if new.get("source") != self.cfg.get("source"):
-                if new["source"] == "mobcam" and new["audio"] == "hdmi":
+                if new["source"] in PHONE_SOURCES and new["audio"] == "hdmi":
                     new["audio"] = "mobcam"
-                elif new["source"] != "mobcam" and new["audio"] == "mobcam":
+                elif new["source"] not in PHONE_SOURCES and new["audio"] == "mobcam":
                     new["audio"] = "hdmi"
             changed = new != self.cfg
             if new.get("usb_format") != self.cfg.get("usb_format"):

@@ -61,6 +61,9 @@ typedef struct {
     gboolean base_ok;       /* base_ns gültig */
     gint64 base_ns;         /* kleinste beobachtete Differenz Haupt-Takt minus Kamera-Takt: gleichmäßige Bildabstände */
     double jit_ms;          /* geglättete Verspätung der Bilder gegenüber dem gleichmäßigen Takt */
+    gint vr_w, vr_h;        /* Bildgröße, die videorate zuletzt gesehen hat (0 = noch keine) */
+    gint64 vr_last_us;      /* Zeitpunkt des letzten Bilds vor videorate */
+    volatile gint vr_block; /* 1 = Bildgröße hat gewechselt, Zweig wird neu gestartet, Bilder werden bis dahin verworfen */
 } cam_t;
 
 typedef struct {
@@ -296,6 +299,49 @@ static GstFlowReturn on_cam_audio(GstAppSink *s, gpointer u) { cam_t *c = u; ret
 
 static void cam_stop(cam_t *c);
 static gboolean cam_start(cam_t *c);
+static void cam_restart(cam_t *c, const char *why);
+
+/* Schutz vor einem Fehler in GStreamer: Wechselt die Bildgröße im laufenden Zweig und liegt zwischen zwei Bildern mehr als etwa 80 ms
+ * (zum Beispiel beim Drehen des Handys), bricht videorate mit "next_output_ts >= base_output_ts" ab und reißt den ganzen Kodierer mit.
+ * Wir fangen die neue Bildgröße vor videorate ab, verwerfen Bilder und Ereignis und starten nur diesen Zweig neu. */
+#define VR_GAP_US 50000
+
+static gboolean cam_size_restart(gpointer u)
+{
+    cam_t *c = u;
+    if (c->pipe && c->want_run)
+        cam_restart(c, "Bildgröße hat sich geändert");
+    return G_SOURCE_REMOVE;
+}
+
+static GstPadProbeReturn on_vr_sink(GstPad *pad, GstPadProbeInfo *info, gpointer u)
+{
+    cam_t *c = u;
+    (void)pad;
+    if (info->type & GST_PAD_PROBE_TYPE_BUFFER) {
+        if (g_atomic_int_get(&c->vr_block))
+            return GST_PAD_PROBE_DROP;
+        c->vr_last_us = now_us();
+        return GST_PAD_PROBE_OK;
+    }
+    GstEvent *ev = GST_PAD_PROBE_INFO_EVENT(info);
+    if (!ev || GST_EVENT_TYPE(ev) != GST_EVENT_CAPS)
+        return GST_PAD_PROBE_OK;
+    GstCaps *caps = NULL;
+    gst_event_parse_caps(ev, &caps);
+    GstStructure *st = caps && gst_caps_get_size(caps) ? gst_caps_get_structure(caps, 0) : NULL;
+    gint w = 0, h = 0;
+    if (!st || !gst_structure_get_int(st, "width", &w) || !gst_structure_get_int(st, "height", &h))
+        return GST_PAD_PROBE_OK;
+    if (c->vr_w && (w != c->vr_w || h != c->vr_h) && c->vr_last_us && now_us() - c->vr_last_us > VR_GAP_US) {
+        if (g_atomic_int_compare_and_exchange(&c->vr_block, 0, 1))
+            g_idle_add(cam_size_restart, c);
+        return GST_PAD_PROBE_DROP;
+    }
+    c->vr_w = w;
+    c->vr_h = h;
+    return GST_PAD_PROBE_OK;
+}
 
 /* Nach dem (Neu-)Start einer Kamera die zuletzt gesetzten Eigenschaften ihrer Elemente wieder anwenden */
 static void reapply_props(GstElement *pipe)
@@ -378,6 +424,22 @@ static gboolean cam_start(cam_t *c)
         gst_object_unref(aout);
     }
     reapply_props(p);
+    c->vr_w = c->vr_h = 0;
+    c->vr_last_us = 0;
+    g_atomic_int_set(&c->vr_block, 0);
+    {
+        gchar *vrn = g_strdup_printf("cam%d_vr", c->id);
+        GstElement *vr = gst_bin_get_by_name(GST_BIN(p), vrn);
+        g_free(vrn);
+        if (vr) {
+            GstPad *sp = gst_element_get_static_pad(vr, "sink");
+            if (sp) {
+                gst_pad_add_probe(sp, GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, on_vr_sink, c, NULL);
+                gst_object_unref(sp);
+            }
+            gst_object_unref(vr);
+        }
+    }
     GstBus *bus = gst_element_get_bus(p);
     gst_bus_add_watch(bus, on_cam_bus, c);
     gst_object_unref(bus);

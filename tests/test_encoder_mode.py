@@ -67,7 +67,7 @@ class TestKameraEingang(unittest.TestCase):
 
     def test_mit_baustein_beide_codecs(self):
         t = self._build(True)
-        self.assertIn("rtmpsrc name=cam0_src location=rtmp://127.0.0.1:1935/publish/cam1 ! pbflvfix name=cam0_fix ! flvdemux name=cam0", t)
+        self.assertIn("rtmp2src name=cam0_src location=rtmp://127.0.0.1:1935/publish/cam1 ! pbflvfix name=cam0_fix ! flvdemux name=cam0", t)
         self.assertIn("cam0. ! video/x-h264 ! h264parse name=cam0_parse ! funnel name=cam0_vf", t)
         self.assertIn("cam0. ! video/x-h265 ! h265parse name=cam0_parse5 ! video/x-h265,stream-format=byte-stream,alignment=au ! cam0_vf.", t)
         self.assertIn("cam0_vf. ! queue name=cam0_vq", t)      # hier wirkt die Kameraverzögerung (min-threshold-time)

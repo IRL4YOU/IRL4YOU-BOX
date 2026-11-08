@@ -174,20 +174,6 @@ def ring_rects(g):
     return [(x, y, w, bw), (x, y + h - bw, w, bw), (x, y + bw, bw, h - 2 * bw), (x + w - bw, y + bw, bw, h - 2 * bw)]
 
 
-def fit_big(dims):
-    if not dims or not dims[0] or not dims[1]:
-        return 0, 0, CANVAS_W, CANVAS_H
-    aspect = dims[1] / float(dims[0])
-    cav = CANVAS_H / float(CANVAS_W)
-    if abs(aspect - cav) <= 0.01:
-        return 0, 0, CANVAS_W, CANVAS_H
-    if aspect > cav:
-        w = int(CANVAS_H / aspect) & ~1
-        return ((CANVAS_W - w) // 2) & ~1, 0, w, CANVAS_H
-    h = int(CANVAS_W * aspect) & ~1
-    return 0, ((CANVAS_H - h) // 2) & ~1, CANVAS_W, h
-
-
 def slot_keys(c):
     b = pa.Binder()
     b.update([k for k in (c.get("main", ""), c.get("pip", ""), c.get("pip2", ""), c.get("pip3", "")) if k])
@@ -300,9 +286,9 @@ def cam_video_head(nm, flvfix):
     Handy-Apps): je ein Parser pro Codec, ein funnel führt beide vor dem Hardware-Dekoder zusammen (nur einer bekommt Daten).
     H.265 geht als byte-stream/au in den Dekoder (hvc1 aus FLV nimmt er nicht an). Ohne den Baustein: wie früher nur H.264."""
     if not flvfix:
-        return (f"rtmpsrc name={nm}_src location=@LOC@ ! flvdemux name={nm}\n"
+        return (f"rtmp2src name={nm}_src location=@LOC@ ! flvdemux name={nm}\n"
                 f"{nm}.video ! queue name={nm}_vq max-size-time=4000000000 max-size-buffers=400 ! parsebin name={nm}_parse ! ")
-    return (f"rtmpsrc name={nm}_src location=@LOC@ ! pbflvfix name={nm}_fix ! flvdemux name={nm}\n"
+    return (f"rtmp2src name={nm}_src location=@LOC@ ! pbflvfix name={nm}_fix ! flvdemux name={nm}\n"
             f"{nm}. ! video/x-h264 ! h264parse name={nm}_parse ! funnel name={nm}_vf\n"
             f"{nm}. ! video/x-h265 ! h265parse name={nm}_parse5 ! video/x-h265,stream-format=byte-stream,alignment=au ! {nm}_vf.\n"
             f"{nm}_vf. ! queue name={nm}_vq max-size-time=4000000000 max-size-buffers=400 ! ")
@@ -352,7 +338,7 @@ def build(c, base=RTMP_BASE, frame=None):
             f"videorate name={nm}_vr max-duplication-time=100000000 ! capsfilter name={nm}_c1 caps=\"video/x-raw,framerate={FPS}/1\" ! "
             f"videocrop name={nm}_crop ! "
             f"videoscale name={nm}_sc method=nearest-neighbour ! "
-            f"capsfilter name={nm}_scc caps=\"video/x-raw,format=NV12,width={CANVAS_W},height={CANVAS_H}\" ! "
+            f"capsfilter name={nm}_scc caps=\"video/x-raw,format=NV12,width={CANVAS_W},height={CANVAS_H},pixel-aspect-ratio=1/1\" ! "
             f"capssetter name={nm}_c2 join=true replace=false caps=\"video/x-raw,colorimetry=bt709\" ! "
             "appsink name=vout\n"
             f"{nm}.audio ! queue name={nm}_aq max-size-time={abuf} max-size-buffers=0 max-size-bytes=0 ! aacparse name={nm}_ap ! avdec_aac name={nm}_ad ! "
@@ -362,7 +348,9 @@ def build(c, base=RTMP_BASE, frame=None):
 
 
 def scale_caps(w, h):
-    return f"video/x-raw,format=NV12,width={w},height={h}"
+    # pixel-aspect-ratio=1/1: videoscale hält das Seitenverhältnis mit schwarzen Rändern, statt das Bild zu dehnen (der Mischer ignoriert das
+    # Seitenverhältnis der Pixel). Wichtig, wenn die Bildgröße einer Kamera wechselt (Handy dreht Hochkant/Quer) und die Aufteilung erst später nachzieht.
+    return f"video/x-raw,format=NV12,width={w},height={h},pixel-aspect-ratio=1/1"
 
 
 def strip_caps(w, h):
@@ -442,7 +430,7 @@ class Layout:
                 add(("a", s), f"pad mix sink_{s} alpha 0", -1)
                 continue
             if pos == 0:
-                x, y, w, h = fit_big(dims.get(s))
+                x, y, w, h = 0, 0, CANVAS_W, CANVAS_H          # volle Fläche: videoscale passt jedes Bild mit Rändern ein (kein Dehnen beim Drehen)
                 crop, sw, sh, alpha, z = (0, 0, 0, 0), w, h, 1.0, Z_BIG
             else:
                 g = geoms[pos]
@@ -526,7 +514,7 @@ class Layout:
         for s, pos in pre_roles.items():
             nm = f"cam{s}"
             if pos == 0:
-                x, y, w, h = fit_big(dims.get(s))
+                x, y, w, h = 0, 0, CANVAS_W, CANVAS_H
                 crop, sw, sh = (0, 0, 0, 0), w, h
             else:
                 g = geoms[pos]

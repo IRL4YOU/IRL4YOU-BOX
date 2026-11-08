@@ -16,6 +16,8 @@ IRL4YOU Box besteht aus eigenem Code (CC BY-ND 4.0, siehe `LICENSE` und `ZUSATZE
 
 Die Quelle „Mobcam“ (iPhone mit Moblin per USB-Kabel als Kamera) spricht das Mobcam-Protokoll des Projekts [eerimoq/mobcam](https://github.com/eerimoq/mobcam) von Erik Moqvist (GPL-2.0; die App Moblin selbst: MIT). `irl4you/mobcam_rtmp.py` ist eine eigene Umsetzung des Nachrichtenformats in Python; Programmcode aus Mobcam ist nicht enthalten, das Programm `mobcam-virtualcam` wird nicht verwendet. Die USB-Verbindung stellt `usbmuxd` (LGPL-2.1/GPL-2.0) her.
 
+Die Quelle „IRL4YOU Cam“ (Android-Handy per USB-Kabel) nutzt ein eigenes Protokoll über Android Open Accessory (`irl4you/android_cam.py`), ohne Fremdcode.
+
 IRL4YOU Box ist kein Produkt von Radxa, Orange Pi, Rockchip oder DJI.
 
 ## Moblin (MIT)
