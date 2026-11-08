@@ -172,6 +172,18 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertIn("'#i-eye' : '#i-eyeoff'", boot)
         self.assertIn("b.setAttribute('aria-label', t)", boot)
 
+    def test_ansicht_handy_automatisch(self):
+        # System > Box > Aussehen: "Handy" setzt den Cookie pb_view_mode, der Server liefert dann den schmalen Rahmen um die NEUE Oberfläche
+        sysjs = _read(os.path.join(WEB, "neu", "views", "system.js"))
+        self.assertIn("pb_view_mode=", sysjs)
+        self.assertIn("[['auto', 'Automatisch'], ['mobile', 'Handy']]", sysjs)
+        self.assertIn("(window.top || window).location.reload()", sysjs)
+        r = _read(os.path.join(IRL, "webui", "routes_get.py"))
+        self.assertIn('phone_frame("/neu?app=1")', r)
+        self.assertIn('phone_frame("/?app=1")', r)         # die bisherige Oberfläche behält ihren Rahmen
+        i = r.index("self.phone_view_wanted()")
+        self.assertIn("self.authed()", r[i - 120:i])
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
