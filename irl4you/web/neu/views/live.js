@@ -106,7 +106,7 @@
       let st; try { st = await api('GET', '/api/preview'); } catch (e) { st = { available: false, why: 'missing' }; }
       prevBtn.removeAttribute('aria-busy'); if (my !== prevGen) return;
       if (!st.available) return prevStop(auto && (st.why === 'off' || st.why === 'kein-bild') ? '' : (WHY[st.why] || WHY.missing));
-      prevOn = true; prevMsg.hidden = true; prevBtn.replaceChildren(ico('stop', 'sm'), 'Stop');
+      prevOn = true; prevMsg.hidden = true; prevBtn.replaceChildren(ico('stop', 'sm'), 'Stopp');
       if (st.origin === 'extern' && !auto) toast('Vorschau von außen: klein, damit der Upload für die Sendung bleibt.');
       playStream(my);
       if (!always()) prevTimer = setTimeout(() => prevStop('Die Vorschau ist nach 10 Minuten beendet.', true), Math.max(5, (st.max_seconds || 600) - 3) * 1000);
@@ -228,7 +228,7 @@
         title = running ? 'Du bist live' : (LABEL[s.state] || s.state);
         const since = s.since ? dur(Date.now() / 1000 - s.since) : null;
         sub = [since && `Seit ${since}`, s.server && s.server.name, send.send_mbps != null && `${fmt(send.send_mbps)} Mbit/s`].filter(Boolean).join(' · ');
-        action = btn(running ? 'Beenden' : 'Bitte warten', { variant: running ? 'danger' : null, size: 'lg', ico: 'stop', disabled: !running, run: async () => {
+        action = btn(running ? 'Stopp' : 'Bitte warten', { variant: running ? 'danger' : null, size: 'lg', ico: 'stop', disabled: !running, run: async () => {
           await api('POST', '/api/send', { action: 'stop' }); setTimeout(() => App.data['send:refresh'] && App.data['send:refresh'](), 600);
         } });
       } else if (s.can_start) {
@@ -260,7 +260,7 @@
       if (!active) {
         const a = s.autostart || {};
         kids.push(h('div', { style: 'margin-top:var(--space-3);border-top:1px solid var(--border);padding-top:var(--space-2)' },
-          sw({ s: 'Automatisch starten', k: 'autostart kamera sendet live', checked: a.enabled, label: 'Automatisch starten, sobald eine Kamera sendet', hint: a.phase === 'wartet' ? (a.until ? `Wartet auf eine sendende Kamera (bis ${Neu.ftime(a.until)} Uhr)` : 'Wartet auf eine sendende Kamera') : (a.phase === 'aufgegeben' || a.phase === 'abgebrochen') && a.message ? a.message : 'Gilt nur nach dem Hochfahren der Box, einmal pro Start: Sobald eine Kamera sendet (die Box wartet bis zu 10 Minuten darauf), geht sie von selbst live. „Live beenden“ bricht die Automatik für diesen Start ab. Verbraucht Mobilfunkdaten.',
+          sw({ s: 'Automatisch starten', k: 'autostart kamera sendet live', checked: a.enabled, label: 'Automatisch starten, sobald eine Kamera sendet', hint: a.phase === 'wartet' ? (a.until ? `Wartet auf eine sendende Kamera (bis ${Neu.ftime(a.until)} Uhr)` : 'Wartet auf eine sendende Kamera') : (a.phase === 'aufgegeben' || a.phase === 'abgebrochen') && a.message ? a.message : 'Gilt nur nach dem Hochfahren der Box, einmal pro Start: Sobald eine Kamera sendet (die Box wartet bis zu 10 Minuten darauf), geht sie von selbst live. „Stopp“ bricht die Automatik für diesen Start ab. Verbraucht Mobilfunkdaten.',
             onchange: (on, el) => run(el, () => api('POST', '/api/autostart', { enabled: on })) })));
       }
       const hsg = kids.map(n => n.outerHTML !== undefined ? n.outerHTML : n.textContent).join('') + '|' + JSON.stringify((s.autostart || {}).enabled);
@@ -274,7 +274,7 @@
           btn('Später', { size: 'sm', onclick: () => { pendIgnored = pend.join('|'); renderHero(); } })] })] : []));
     }
 
-    const upHist = [];
+    let liveSig = null;       // die Kurve „Upload“ ist dieselbe wie in der Kopfzeile (kopf.js)
     /* Upload wie in der bisherigen Oberfläche: Nutzdaten der Sendung (ohne Kopfdaten und Neuübertragungen), höchstens die Summe auf der Leitung */
     const upSel = (m, sr) => { const sel = sr && sr.settings ? sr.settings.uplinks : null; const nets = Object.entries(m.net || {}), f = sel ? nets.filter(([n]) => sel.includes(n)) : []; return f.length ? f : nets; };
     const upTotal = (m, sr) => upSel(m, sr).reduce((a, [, v]) => a + (+v.tx_mbit || 0), 0);
@@ -283,13 +283,11 @@
       const s = App.data.send || {}, m = App.data.metrics || {}, sr = App.data.srtla;
       const send = (m.details || {}).send || {};
       const up = upShown(m, sr);
-      upHist.push(up); if (upHist.length > 30) upHist.shift();
-      const spark = () => { const mx = Math.max(1, ...upHist), pts = upHist.map((v, i) => `${(i / 29 * 100).toFixed(1)},${(22 - v / mx * 20).toFixed(1)}`).join(' '); const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'spark'); svg.setAttribute('viewBox', '0 0 100 24'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true'); const pl = document.createElementNS('http://www.w3.org/2000/svg', 'polyline'); pl.setAttribute('points', pts); svg.append(pl); return svg; };
       const stat = (label, value, unit, bar, tone, extra) => h('div', { class: 'card' }, h('div', { class: 'card__body' }, h('div', { class: 'stat' }, h('span', { class: 'stat__label', text: label }), h('span', { class: 'stat__value' }, value, h('span', { class: 'stat__unit', text: unit }))),
         bar != null && h('div', { class: 'meter', data: tone ? { tone } : {} }, h('span', { style: `--value:${Math.max(0, Math.min(100, bar))}%` })), extra));
       const cpu = (m.cpu || {}).avg, temp = m.temp_c, mem = m.mem || {};
       const cards = [
-        stat('Upload', fmt(up), 'Mbit/s', null, null, (() => { const mx = Math.max(1, ...upHist); return h('div', { class: 'spark-box' }, h('span', { class: 'spark__scale', 'aria-hidden': 'true' }, h('i', null, fmt(mx, 1)), h('i', null, fmt(mx / 2, 1)), h('i', null, '0')), spark()); })()),
+        stat('Upload', fmt(up, 1), 'Mbit/s', null, null, h('div', { class: 'sig-slot' })),
         stat('Prozessor', fmt(cpu, 0), '%', cpu, cpu > 90 ? 'danger' : cpu > 75 ? 'warn' : undefined, m.cpu && m.cpu.max != null ? h('span', { class: 'muted', style: 'font-size:var(--text-xs)', text: `höchster Kern ${fmt(m.cpu.max, 0)} %` }) : null),
         stat('Temperatur', fmt(temp, 0), '°C', temp != null ? temp / 100 * 100 : null, temp > 80 ? 'danger' : temp > 70 ? 'warn' : 'ok'),
         stat('Arbeitsspeicher', fmt(mem.used_pct, 0), '% belegt', mem.used_pct, mem.used_pct > 90 ? 'danger' : mem.used_pct > 80 ? 'warn' : undefined, h('span', { class: 'muted', style: 'font-size:var(--text-xs)', text: `${fmt((mem.avail_mb || 0) / 1024)} GiB frei` })),
@@ -297,13 +295,11 @@
       /* Aufbau nur ändern, wenn sich Beschriftung, Einheit oder Farbe ändern; sonst die Zahlen, Balken und die Kurve an Ort und Stelle nachtragen (kein Flackern) */
       const shape = cards.map(c => [c.querySelector('.stat__label').textContent, c.querySelector('.stat__unit').textContent, !!c.querySelector('.meter'), (c.querySelector('.meter') || { dataset: {} }).dataset.tone || '']);
       const sg = JSON.stringify(shape);
-      if (kpi.__sg !== sg || kpi.children.length !== cards.length) { kpi.__sg = sg; kpi.replaceChildren(...cards); return; }
+      if (kpi.__sg !== sg || kpi.children.length !== cards.length) { kpi.__sg = sg; kpi.replaceChildren(...cards); const slot = kpi.querySelector('.sig-slot'); if (slot && Neu.sigMeter) { liveSig = liveSig || Neu.sigMeter(); slot.append(liveSig); } return; }
       cards.forEach((n, i) => {
         const o = kpi.children[i], ov = o.querySelector('.stat__value'), nv = n.querySelector('.stat__value');
         if (ov.firstChild && nv.firstChild && ov.firstChild.nodeValue !== nv.firstChild.nodeValue) ov.firstChild.nodeValue = nv.firstChild.nodeValue;
         const om = o.querySelector('.meter > span'), nm = n.querySelector('.meter > span'); if (om && nm) om.setAttribute('style', nm.getAttribute('style'));
-        const op = o.querySelector('.spark polyline'), np = n.querySelector('.spark polyline'); if (op && np) op.setAttribute('points', np.getAttribute('points'));
-        const os = o.querySelectorAll('.spark__scale i'), ns = n.querySelectorAll('.spark__scale i'); ns.forEach((e, k) => { if (os[k] && os[k].textContent !== e.textContent) os[k].textContent = e.textContent; });
         const ox = o.querySelector('.card__body > .muted'), nx = n.querySelector('.card__body > .muted'); if (ox && nx && ox.textContent !== nx.textContent) ox.textContent = nx.textContent;
       });
     }
