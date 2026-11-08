@@ -286,6 +286,9 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertIn("if (msg.textContent !== mt) msg.textContent = mt;", chat)
         self.assertIn("if (statusEl.__k !== d.state)", chat)
         self.assertIn("checked_at: Math.floor((d.checked_at || 0) / 60)", _read(os.path.join(WEB, "neu", "views", "system.js")))
+        core = _read(os.path.join(WEB, "neu", "core.js"))
+        self.assertIn("Object.defineProperty(Node.prototype, 'textContent'", core)       # gleicher Text wird nicht neu geschrieben
+        self.assertIn("f.nodeValue === t) return;", core)
         wlan = _read(os.path.join(WEB, "neu", "views", "wlan.js"))
         self.assertIn("App.on('srtla', render);", wlan)
         self.assertNotIn("App.on('srtla', () => { sig = ''", wlan)

@@ -125,6 +125,16 @@ class TestUpdateTakt(unittest.TestCase):
             finally:
                 U.Config.__init__.__defaults__ = (old, None)
 
+    def test_liste_alle_aenderungen_holt_50_staende(self):
+        # die Liste "Alle Änderungen" zeigt die letzten 50 Stände (vorher 15); die Versionsauswahl bleibt bei den neuesten 15
+        with open(os.path.join(ROOT, "updater", "irl4you_update.py"), encoding="utf-8") as f:
+            u = f.read()
+        self.assertIn("HISTORY = 50", u)
+        self.assertIn("commits = self.commits(self.HISTORY)", u)
+        with open(os.path.join(ROOT, "irl4you", "webui", "updates.py"), encoding="utf-8") as f:
+            w = f.read()
+        self.assertIn("for r in rels[:15]:", w)
+
     def test_prueft_nur(self):
         # Die Prüfung ruft "auto" auf; installiert wird nur mit auto_install in update.conf (Standard: aus)
         self.assertIn("ExecStart=/usr/local/sbin/irl4you-update auto", _text("irl4you-update-auto.service"))
