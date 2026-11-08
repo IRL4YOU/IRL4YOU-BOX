@@ -218,6 +218,27 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertNotIn("'Beenden'", live)
         self.assertNotIn("'Stopp'", live + schnell)
 
+    def test_reiter_updates_hat_gelben_punkt(self):
+        # wie am Menüpunkt System: ein kleiner gelber Punkt am Reiter "Updates", solange eine neue Version bereitliegt
+        sysjs = _read(os.path.join(WEB, "neu", "views", "system.js"))
+        self.assertIn("class: 'dot tab-dot', hidden: true", sysjs)
+        self.assertIn("App.on('swupdate', showTabDot); App.on('hdrupd', showTabDot);", sysjs)
+        self.assertIn(".tab-dot { display: inline-block;", _read(os.path.join(WEB, "neu", "app.css")))
+
+    def test_neue_texte_in_allen_sprachen(self):
+        # was an einem Tag neu oder geändert wird, steht in allen Sprachdateien (Englisch und die zwölf anderen)
+        import glob
+        import json
+        hint_neu = "„Stop“ bricht die Automatik"
+        for f in sorted(glob.glob(os.path.join(WEB, "i18n", "*.json"))):
+            if f.endswith("languages.json"):
+                continue
+            ex = json.loads(_read(f))["exact"]
+            for k in ("Ansicht", "Handy", "kommt gleich", "Einstellungen durchsuchen (Strg K)", "Passwort ändern", "Stop"):
+                self.assertIn(k, ex, (f, k))
+            self.assertTrue([k for k in ex if hint_neu in k], f)
+            self.assertFalse([k for k in ex if "„Live beenden“" in k], f)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
