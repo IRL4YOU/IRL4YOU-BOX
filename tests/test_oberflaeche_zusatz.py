@@ -320,6 +320,8 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertIn("Neu.stable([d, [...Object.keys(open)]", _read(os.path.join(WEB, "neu", "views", "wlan.js")))
         self.assertIn("if (sg === status.__sg) return;", _read(os.path.join(WEB, "neu", "views", "mehr-chat.js")))
         self.assertIn("if (scSig === scanList.__sg) return;", _read(os.path.join(WEB, "neu", "views", "kameras.js")))
+        self.assertIn("if (scanBtn.__t !== scT)", _read(os.path.join(WEB, "neu", "views", "kameras.js")))
+        self.assertIn("if (sg === uaCard.__sg) return;", _read(os.path.join(WEB, "neu", "views", "zugriff.js")))
 
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
