@@ -117,7 +117,7 @@
   /* ---------- Streammodus: sperrt Server/Bitrate und Fernzugriff gegen versehentliches Ändern ---------- */
   (() => {
     const b = $('#sm-btn'); let on = false; try { on = localStorage.getItem('pb_sendemodus') === '1'; } catch (e) { /* privat */ }
-    const apply = () => { document.body.classList.toggle('sm', on); b.setAttribute('aria-pressed', String(on)); b.querySelector('span').textContent = on ? 'Streammodus: an' : 'Streammodus: aus'; b.dataset.variant = on ? 'primary' : ''; try { localStorage.setItem('pb_sendemodus', on ? '1' : '0'); } catch (e) { /* privat */ } };
+    const apply = () => { document.body.classList.toggle('sm', on); b.setAttribute('aria-pressed', String(on)); const t = on ? 'Streammodus: an' : 'Streammodus: aus'; b.setAttribute('aria-label', t); b.title = t + (on ? '. Server, Bitrate und Fernzugriff sind gesperrt, Adressen und Namen ausgeblendet' : '. Sperrt Server, Bitrate und Fernzugriff gegen versehentliches Ändern'); b.querySelector('use').setAttribute('href', on ? '#i-eye' : '#i-eyeoff'); b.dataset.variant = on ? 'primary' : ''; try { localStorage.setItem('pb_sendemodus', on ? '1' : '0'); } catch (e) { /* privat */ } };
     b.addEventListener('click', () => { on = !on; apply(); }); apply();
   })();
 
