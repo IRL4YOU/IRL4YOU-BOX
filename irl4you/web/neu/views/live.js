@@ -16,7 +16,7 @@
   view('live', sec => {
     const hero = h('div', { class: 'card__body' });
     const heroCard = h('section', { class: 'card' }, hero);
-    const pending = h('div'), alerts = h('div', { class: 'stack', style: '--gap:var(--space-3)' });
+    const pending = h('div'), alerts = h('div', { class: 'stack', style: '--gap:var(--space-3)' }); alerts.hidden = true;                  // Meldungen stehen ganz oben, über der Überschrift
     const kpi = h('div', { class: 'kpis' });
     const linesBody = h('div', { class: 'card__body', data: { flush: '' }, style: 'padding-top:var(--space-3)' });
     const camsBody = h('div', { class: 'card__body', data: { flush: '' }, style: 'padding-top:var(--space-3)' });
@@ -173,7 +173,6 @@
       ['steuerung', 'Bild und Ton jetzt (erscheint während der Sendung)', [liveCtlCard], 'a', true],
       ['deck', 'Deck', [Neu.chat.deckFrameCard()], 'a', true],
       ['details', 'Systemdetails', [card({ title: 'Systemdetails', sub: 'Sendung, Prozessor (jeder Kern), Temperaturen und Speicher.', body: det })], 'a', true],
-      ['meldungen', 'Meldungen', [alerts], 'b', true],
       ['leitungen', 'Leitungen', [linkCard('Leitungen', 'netz', linesBody)], 'b', true],
       ['kameras', 'Kameras', [linkCard('Kameras', 'kameras', camsBody)], 'b', true],
       ['chat', 'Chat', [Neu.chat.feedCard()], 'b', true],
@@ -214,7 +213,7 @@
     const arrBtn = btn('Anordnen', { size: 'sm', ico: 'sliders', onclick: () => setEdit(!editing) });
     function setEdit(v) { editing = v; arrBar.hidden = !v; arrBtn.hidden = v; place(); }
     mq.addEventListener('change', place);
-    sec.append(pageHead('Live', 'Alles, was du während der Sendung brauchst.', [arrBtn]), arrBar, h('div', { class: 'cols-main' }, colA, colB));
+    sec.append(alerts, pageHead('Live', 'Alles, was du während der Sendung brauchst.', [arrBtn]), arrBar, h('div', { class: 'cols-main' }, colA, colB));
     place();
 
     /* ---------- Zustand der Sendung ---------- */
@@ -278,6 +277,7 @@
       setIf(pending, (pend.length && pend.join('|') !== pendIgnored ? [alertBox({ tone: 'warn', title: 'Änderungen noch nicht übernommen', text: `Geändert: ${pend.join(', ')}. Das gilt erst nach einem Neustart der Sendung.`,
         actions: [btn('Sendung neu starten', { size: 'sm', variant: 'primary', run: async () => { if (await ask({ title: 'Sendung neu starten?', text: 'Das Bild ist dabei einige Sekunden weg.', ok: 'Neu starten' })) { await api('POST', '/api/send', { action: 'restart', confirm: true }); setTimeout(() => App.data['send:refresh'] && App.data['send:refresh'](), 600); } } }),
           btn('Später', { size: 'sm', onclick: () => { pendIgnored = pend.join('|'); renderHero(); } })] })] : []));
+      pending.hidden = !pending.children.length;                  // leer: kein zusätzlicher Abstand unter der Karte
     }
 
     let liveSig = null;       // die Kurve „Upload“ ist dieselbe wie in der Kopfzeile (kopf.js)
@@ -347,6 +347,7 @@
           text: [a.name, where, when(a.t), a.back ? 'wieder da' : '', power ? 'Bitte Stromversorgung prüfen' : '', power ? 'Der USB-Anschluss wurde abgeschaltet (Störung oder Spannungseinbruch). Netzteil und USB-Hub prüfen, den Adapter möglichst direkt am Board anstecken.' : 'Das USB-Gerät wurde getrennt, abgezogen oder ausgefallen. Kabel und Stromversorgung prüfen.'].filter(Boolean).join(' · ') };
       }
       if (a.kind === 'cam') return { title: (a.cam === 'dji' ? 'DJI-Kamera ausgefallen: ' : 'Kamera ausgefallen: ') + (a.name || ''), text: [when(a.t), a.cam === 'dji' ? 'Bluetooth getrennt, Akku leer oder Kamera ausgeschaltet. Kamera aufwecken und die Verbindung prüfen.' : 'Die Kamera sendet nicht mehr. Akku, WLAN-Verbindung und Kabel prüfen.'].join(' · '), dismiss: true };
+      if (a.kind === 'hdmi' && a.rate) return { title: '', text: 'Die Bitrate der Mobcam ist zu hoch. Bitte in Moblin höchstens 10 Mbit/s einstellen.', dismiss: false };
       if (a.kind === 'hdmi') return { title: a.src === 'usb' ? 'USB-Kamera nicht gefunden' : a.src === 'mobcam' ? 'iPhone nicht gefunden' : 'HDMI: kein Signal', text: [when(a.t), a.src === 'usb' ? 'Kamera anstecken und einschalten: Sie muss sich als USB-Webcam (UVC) melden, bei Action-Kameras im Webcam-Modus.' : a.src === 'mobcam' ? 'iPhone mit einem USB-Datenkabel anstecken, entsperren und „Vertrauen“ tippen. In Moblin muss die Stream-Adresse mobcam://localhost:7790 stehen.' : 'Kabel prüfen und die Kamera einschalten: Sie muss ein Bild ausgeben.'].join(' · '), dismiss: true };
       if (a.kind === 'dstate' && (a.names || []).length) return { title: a.text || 'Meldung', text: 'Wartet im Kernel: ' + a.names.join(', '), dismiss: false };
       return { title: a.text || 'Meldung', text: '', dismiss: false };
@@ -358,6 +359,7 @@
         const i = alertInfo(a);
         return alertBox({ tone: a.level === 'crit' ? 'danger' : 'warn', title: i.title, text: i.text, actions: i.dismiss ? [btn('Verstanden', { size: 'sm', run: async () => { await api('POST', '/api/alerts/dismiss', { kind: a.kind, t: a.t }); App.data['metrics:refresh'] && App.data['metrics:refresh'](); } })] : [] });
       })));
+      alerts.hidden = !alerts.children.length;
     }
 
     App.on('rotation', renderLiveCtl); App.on('send', () => { renderHero(); renderLiveCtl(); }); App.on('srtla', () => { renderHero(); renderKpi(); renderLines(); });
