@@ -14,6 +14,8 @@ from .pipeline_plugins import PENDING_LABELS, SWAP_SELECT, SWAP_STATE, VIEW_FILE
 
 class SendControl:
     STATUS = "/run/pipbox-send/status.json"
+    UPDATE_STATUS = "/run/pipbox-swupdate/status.json"
+    UPDATE_MAX_AGE = 30 * 60          # ein "installing" ohne Lebenszeichen seit so langer Zeit gilt als übrig geblieben (Absturz), nicht als laufendes Update
     SWAP_WAIT = 2.0
 
     def __init__(self, state_dir, srtla, pipeline, cams, demo=False):
@@ -84,8 +86,21 @@ class SendControl:
                 out[k] = ("aus", 0)
         return out
 
+    def update_running(self):
+        """Läuft gerade die Installation eines Software-Updates? Dann darf nicht live gegangen werden (die Dienste werden dabei neu gestartet)."""
+        if self.demo:
+            return False
+        try:
+            with open(self.UPDATE_STATUS) as f:
+                d = json.load(f)
+            return d.get("state") == "installing" and time.time() - float(d.get("time", 0)) < self.UPDATE_MAX_AGE
+        except (OSError, ValueError, TypeError, AttributeError):
+            return False
+
     def reasons(self):
         r = []
+        if self.update_running():
+            r.append("Es läuft gerade ein Software-Update")
         pub = self.srtla.public()
         if not pub["selected"]:
             r.append("Kein SRTLA-Server ausgewählt")
