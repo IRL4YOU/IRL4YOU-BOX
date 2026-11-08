@@ -988,7 +988,8 @@ def main(argv=None):
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         print("Es läuft schon ein Update.", file=sys.stderr)
-        return 3
+        # die regelmäßige Prüfung und die Anfrage der Oberfläche sind dann überflüssig: kein Fehlerstatus für die Einheit
+        return 0 if cmd in ("auto", "request") else 3
     if cmd == "request":
         mode, arg = u.read_request()
         return u.run(mode, arg) if mode else 0
