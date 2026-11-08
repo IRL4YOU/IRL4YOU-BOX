@@ -15,7 +15,7 @@
        Updates: Software (IRL4YOU BOX)
        ================================================================= */
     const swBox = h('div');
-    let swChecking = 0, swPending = 0, swSaw = false, swFirst = null, swSig = '', swVersions = [], swCur = '', verInput = input({ placeholder: 'Version wählen oder eintragen, z. B. 0.9.0', maxlength: 24, list: 'sw-vers', autocomplete: 'off' }), verInfo = h('p', { class: 'field__hint' }), dl = h('datalist', { id: 'sw-vers' }), swMsg = note(), swHist = null, histSecs = null, histQ = input({ type: 'search', placeholder: 'Suchen …', maxlength: 60, 'aria-label': 'Änderungen durchsuchen', style: 'height:2rem;padding:0 var(--space-2) 0 2rem;font-size:var(--text-sm)' });
+    let swNote = null, swChecking = 0, swPending = 0, swSaw = false, swFirst = null, swSig = '', swVersions = [], swCur = '', verInput = input({ placeholder: 'Version wählen oder eintragen, z. B. 0.9.0', maxlength: 24, list: 'sw-vers', autocomplete: 'off' }), verInfo = h('p', { class: 'field__hint' }), dl = h('datalist', { id: 'sw-vers' }), swMsg = note(), swHist = null, histSecs = null, histQ = input({ type: 'search', placeholder: 'Suchen …', maxlength: 60, 'aria-label': 'Änderungen durchsuchen', style: 'height:2rem;padding:0 var(--space-2) 0 2rem;font-size:var(--text-sm)' });
     const swPoll = poll('swupdate', '/api/swupdate', 8000, () => App.view === 'system' || swPending);
     const SW_TERMINAL = ['failed', 'refused', 'rolledback']; let swNewer = false, sysAvail = false; const navDot = () => { const nd = document.getElementById('nd-system'); nd.hidden = !(swNewer || sysAvail); nd.dataset.tone = ''; };
     const tip = (el, t) => { el.title = t; return el; };
@@ -37,9 +37,9 @@
         d = await api('GET', '/api/swupdate?check=1'); App.set('swupdate', d);
         const end = Date.now() + 30000;
         while (Date.now() < end && (d.checked_at || 0) === t0 && d.state !== 'installing') { await sleep(1500); d = await api('GET', '/api/swupdate'); App.set('swupdate', d); }
-      } catch (e) { toast(e.message); } finally { swChecking = 0; swSig = ''; }
-      App.set('swupdate', d);
-      toast((d.checked_at || 0) === t0 ? 'Die Prüfung hat nicht geantwortet. Bitte gleich noch einmal versuchen.' : d.newer ? 'Neue Version ' + (d.latest_version || d.latest) + ' ist verfügbar.' : d.pending ? 'Neue Version ' + (d.latest_version || d.latest) + ' wird noch geprüft. Das Update kommt in wenigen Minuten.' : d.message && !/aktuell/i.test(d.message) ? d.message : 'Du hast die neueste Version.');
+      } catch (e) { swNote = { t0, text: e.message || 'Die Prüfung hat nicht geantwortet.' }; } finally { swChecking = 0; swSig = ''; }
+      if (!swNote && (d.checked_at || 0) === t0) swNote = { t0, text: 'Die Prüfung hat nicht geantwortet. Bitte gleich noch einmal versuchen.' };
+      App.set('swupdate', d);       // das Ergebnis steht in der Karte (kein Hinweisfenster unten rechts)
     }
     function renderSw() {
       const d = App.data.swupdate; if (!d) return;
@@ -56,6 +56,7 @@
       else if (d.pending) m = 'Neue Version ' + (d.latest_version || d.latest) + ' wird noch von GitHub geprüft. Das Update kommt in wenigen Minuten.';
       else if (d.latest) m = 'Du hast die neueste Version.' + (d.checked_at ? ` Zuletzt geprüft um ${ftime(d.checked_at)}.` : '');
       if (d.state === 'installing') { if (d.cancel_in === 0) m += ' Es tut seit über 5 Minuten nichts mehr: Du kannst es abbrechen.'; else if (d.cancel_in > 0) m += ` Abbrechen geht, wenn es 5 Minuten lang nichts tut (noch etwa ${Math.ceil(d.cancel_in / 60)} Min.).`; }
+      if (swNote && (d.checked_at || 0) === swNote.t0 && !busy) m = swNote.text; else swNote = null;
       if (swChecking && !busy) m = 'Suche nach Updates …';
       swMsg.set(m, (d.state === 'failed' || d.error) && !swPending ? 'bad' : '');
       const x = () => swVersions.find(v => v.version === verInput.value.trim().replace(/^v/, ''));
