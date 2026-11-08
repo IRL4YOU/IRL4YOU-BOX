@@ -161,7 +161,7 @@ class IfaceMemory:
 
 
 class SrtlaStore:
-    DEFAULT_SETTINGS = {"min_kbps": 400, "max_kbps": 12000, "latency_ms": 4000, "uplinks": ["eth0", "eth1"],
+    DEFAULT_SETTINGS = {"min_kbps": 450, "max_kbps": 12000, "latency_ms": 4000, "uplinks": ["eth0", "eth1"],
                         "spread": "best"}
 
     def __init__(self, path):
