@@ -285,6 +285,7 @@ class TestFusszeileUndLinks(unittest.TestCase):
         chat = _read(os.path.join(WEB, "neu", "views", "chat.js"))
         self.assertIn("if (msg.textContent !== mt) msg.textContent = mt;", chat)
         self.assertIn("if (statusEl.__k !== d.state)", chat)
+        self.assertIn("tip(btn('Abbrechen', { size: 'sm', variant: 'danger', disabled: d.cancel_in !== 0", _read(os.path.join(WEB, "neu", "views", "system.js")))
         self.assertIn("checked_at: Math.floor((d.checked_at || 0) / 60)", _read(os.path.join(WEB, "neu", "views", "system.js")))
         core = _read(os.path.join(WEB, "neu", "core.js"))
         self.assertIn("Object.defineProperty(Node.prototype, 'textContent'", core)       # gleicher Text wird nicht neu geschrieben
