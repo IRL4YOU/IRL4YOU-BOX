@@ -72,6 +72,7 @@ DEFAULTS = {
     "state_dir": "/var/lib/irl4you",
     "status_file": "/run/pipbox-swupdate/status.json",
     "request_file": "/var/lib/pipbox/swupdate-request",
+    "cancel_file": "/var/lib/pipbox/swupdate-cancel",  # die Oberfläche legt sie an, wenn das Update hängt und abgebrochen werden soll
     "log_file": "/var/log/irl4you-update.log",
     "keep": "3",                                    # so viele Versionen bleiben auf der Box (aktive und vorherige immer)
     "max_download_mb": "512",
@@ -84,6 +85,10 @@ DEFAULTS = {
     "ci_grace_minutes": "10",                       # ohne jede Prüfung gilt ein Commit nach so langer Zeit als "keine CI vorhanden"
     "allow_insecure_api": "false",                  # nur für Tests: http:// statt https:// erlauben
 }
+
+
+STALL_S = 300                       # so lange ohne Lebenszeichen im Status, bis ein Abbruch erlaubt ist
+CANCEL_STEPS = ("Frage GitHub nach dem Stand", "Lade neue Version", "Prüfe und entpacke das Archiv")   # nur vor dem Umschalten; danach nie abbrechen (sonst bleibt eine halbe Installation)
 
 
 class Refuse(Exception):
@@ -121,6 +126,7 @@ class Config:
         self.state_dir = s["state_dir"].strip()
         self.status_file = s["status_file"].strip()
         self.request_file = s["request_file"].strip()
+        self.cancel_file = s["cancel_file"].strip()
         self.log_file = s["log_file"].strip()
         self.keep = max(2, s.getint("keep"))
         self.max_download = s.getint("max_download_mb") * 1024 * 1024
@@ -298,6 +304,33 @@ class Updater:
             if r.stdout.strip() in ("active", "activating"):
                 return True
         return False
+
+    def cancel(self):
+        """Ein hängendes Update beenden (nur Vorbereitung, nur wenn der Status 5 Minuten stillsteht). Läuft als eigener Dienst, denn der Installer hält die Sperre."""
+        try:
+            os.remove(self.cfg.cancel_file)
+        except OSError:
+            pass
+        st = self.load_status()
+        if st.get("state") != "installing":
+            self.log("Abbruch verworfen: es läuft kein Update")
+            return 0
+        step = str(st.get("step") or "")
+        if not step.startswith(CANCEL_STEPS):
+            self.log("Abbruch verworfen: im Schritt %r nicht möglich" % step)
+            return 0
+        still = self.now() - float(st.get("time") or 0)
+        if still < STALL_S:
+            self.log("Abbruch verworfen: das Update war vor %d s noch aktiv" % still)
+            return 0
+        self.log("Update wird abgebrochen (Schritt %r, %d s ohne Lebenszeichen)" % (step, still))
+        for unit in ("irl4you-update.service", "irl4you-update-auto.service"):
+            try:
+                self.systemctl("stop", unit)
+            except (OSError, subprocess.SubprocessError) as e:
+                self.log("Dienst %s nicht beendet: %s" % (unit, e))
+        self.status(state="failed", step="", progress=0, message="Das Update wurde abgebrochen. Die Box läuft weiter auf der bisherigen Version, du kannst es erneut starten.")
+        return 0
 
     def systemctl(self, *args):
         return subprocess.run(self.cfg.systemctl + list(args), capture_output=True, text=True, timeout=120)
@@ -828,6 +861,9 @@ class Updater:
         os.makedirs(self.cfg.state_dir, mode=0o755, exist_ok=True)
         if self.free_bytes() < self.cfg.min_free:
             raise Refuse("Zu wenig freier Speicher für das Update")
+        for old in os.listdir(self.cfg.releases):               # Reste eines abgebrochenen oder abgestürzten Ladevorgangs (wir halten die Sperre, es läuft kein zweiter)
+            if old.startswith(".dl-"):
+                shutil.rmtree(os.path.join(self.cfg.releases, old), ignore_errors=True)
         work = tempfile.mkdtemp(dir=self.cfg.releases, prefix=".dl-")
         try:
             self.status(step="Lade neue Version", progress=5)
@@ -988,10 +1024,16 @@ def main(argv=None):
         print(json.dumps(dict(u.load_status(), active=u.active_id(), installed=u.installed_versions(),
                               previous=u.previous_id()), indent=2))
         return 0
+    if cmd == "cancel":
+        return u.cancel()
     os.makedirs(cfg.state_dir, mode=0o755, exist_ok=True)
-    lock = open(os.path.join(cfg.state_dir, "update.lock"), "w")
+    lock = open(os.path.join(cfg.state_dir, "update.lock"), "a+")          # nicht "w": das würde die Datei auch leeren, während ein anderer sie hält
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock.seek(0)
+        lock.truncate()
+        lock.write(str(os.getpid()))
+        lock.flush()
     except OSError:
         print("Es läuft schon ein Update.", file=sys.stderr)
         # die regelmäßige Prüfung und die Anfrage der Oberfläche sind dann überflüssig: kein Fehlerstatus für die Einheit
