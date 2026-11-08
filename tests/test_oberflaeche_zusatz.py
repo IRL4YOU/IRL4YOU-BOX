@@ -150,6 +150,14 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertNotIn("title: 'Passwort der Oberfläche'", box)
         self.assertIn("id: 'sy-box-pw'", sysjs)
 
+    def test_kamera_hinzufuegen_reihenfolge(self):
+        # Hinzufügen: zuerst Bluetooth (DJI), dann HDMI/USB/Testbild, danach RTMP und QR-Code
+        k = _read(os.path.join(WEB, "neu", "views", "kameras.js"))
+        i = k.index("T.add('k-neu'")
+        blk = k[i:k.index("/* ---------- Reiter: HDMI und USB", i)]
+        pos = [blk.index(t) for t in ("DJI-Kamera (Bluetooth)", "HDMI, USB und Testbild", "Handy oder Kamera (RTMP)", "Mit QR-Code einrichten")]
+        self.assertEqual(pos, sorted(pos))
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
