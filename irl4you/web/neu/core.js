@@ -62,6 +62,10 @@
   }
 
   /* ---- Gemeinsame Daten: App.data[schlüssel], App.on(schlüssel, fn), App.view = aktuelle Ansicht ---- */
+  /* Vergleichswert einer Antwort der Box: Felder, die sich bei jeder Abfrage ändern, ohne dass sich etwas Sichtbares ändert ("now" bei WLAN, "reply_to" bei Bluetooth),
+     zählen nicht. Sonst hält jede Abfrage die Seite für "neu" und baut sie immer wieder neu auf (Flackern). */
+  const VOLATILE = new Set(['now', 'reply_to']);
+  const stable = v => { try { return JSON.stringify(v, (k, x) => VOLATILE.has(k) ? undefined : x); } catch (e) { return String(Math.random()); } };
   const App = { data: {}, subs: {}, view: 'live',
     set(k, v) { this.data[k] = v; (this.subs[k] || []).forEach(f => { try { f(v); } catch (e) { console.error(k, e); } }); },
     on(k, f) { (this.subs[k] = this.subs[k] || []).push(f); if (this.data[k] !== undefined) f(this.data[k]); } };
@@ -228,5 +232,5 @@
     if (tabId) setTimeout(() => { const t = document.querySelector(`[role="tab"][aria-controls="${tabId}"]`); if (t) t.click(); }, 30);
   }
 
-  window.Neu = { named, iconBtn, loc, askText, goto, slots, copyText, copyBtn, prog, md, tabbed, kv, fdate, ftime, sleep, note, ownerKey, h, ico, $, $$, fmt, dur, api, App, poll, ask, sheet, closeSheet, toast, run, badge, btn, alertBox, card, row, list, sw, field, input, select, seg, range, disclosure, pageHead, toneOf, view, views };
+  window.Neu = { stable, named, iconBtn, loc, askText, goto, slots, copyText, copyBtn, prog, md, tabbed, kv, fdate, ftime, sleep, note, ownerKey, h, ico, $, $$, fmt, dur, api, App, poll, ask, sheet, closeSheet, toast, run, badge, btn, alertBox, card, row, list, sw, field, input, select, seg, range, disclosure, pageHead, toneOf, view, views };
 })();
