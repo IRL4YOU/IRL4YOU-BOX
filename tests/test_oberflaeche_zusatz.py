@@ -197,6 +197,27 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertIn("App.on('hdrupd', show); App.on('swupdate', show);", kopf)
         self.assertIn("Neu.goto('system', 'sy-update')", kopf)
 
+    def test_upload_kurve_ist_die_der_kopfzeile(self):
+        # "Upload" auf der Live-Seite zeigt dieselbe Kurve (Daten, Skala, Farbe) wie die Kopfzeile, keine zweite Zeichnung
+        kopf = _read(os.path.join(WEB, "neu", "kopf.js"))
+        self.assertIn("Neu.sigMeter = () =>", kopf)
+        self.assertIn("[{ scale: [smax, smid, smin], line }, ...views]", kopf)
+        self.assertIn("[sig, ...views.map(v => v.el)].forEach(e =>", kopf)
+        live = _read(os.path.join(WEB, "neu", "views", "live.js"))
+        self.assertIn("Neu.sigMeter", live)
+        self.assertNotIn("upHist", live)
+        self.assertNotIn("spark-box", live)
+
+    def test_stopp_heisst_ueberall_stopp(self):
+        # Kopfzeile, Fußleiste, großer Knopf und Vorschau: dieselbe kurze Beschriftung
+        schnell = _read(os.path.join(WEB, "neu", "views", "schnell.js"))
+        live = _read(os.path.join(WEB, "neu", "views", "live.js"))
+        self.assertIn("label: 'Stopp', variant: 'danger'", schnell)
+        self.assertIn("btn(running ? 'Stopp' : 'Bitte warten'", live)
+        self.assertIn("ico('stop', 'sm'), 'Stopp')", live)
+        self.assertNotIn("'Beenden'", live)
+        self.assertNotIn("'Stop'", live + schnell)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
