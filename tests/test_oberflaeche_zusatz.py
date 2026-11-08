@@ -311,6 +311,16 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertNotIn("setTimeout(() => { queued = false; scan(); }, 40)", h)
         self.assertIn("if (n.nodeType === 1) { scan(); return; }", h)
 
+    def test_antworten_mit_wechselnden_feldern_loesen_keinen_neuaufbau_aus(self):
+        # /api/wifi ("now") und /api/dji ("reply_to") ändern sich bei JEDER Abfrage: wer die ganze Antwort vergleicht, baut Bluetooth und WLAN dauernd neu
+        core = _read(os.path.join(WEB, "neu", "core.js"))
+        self.assertIn("const VOLATILE = new Set(['now', 'reply_to']);", core)
+        self.assertIn("window.Neu = { stable,", core)
+        self.assertIn("Neu.stable([d, App.data.btdriver, ctAll])", _read(os.path.join(WEB, "neu", "views", "bt.js")))
+        self.assertIn("Neu.stable([d, [...Object.keys(open)]", _read(os.path.join(WEB, "neu", "views", "wlan.js")))
+        self.assertIn("if (sg === status.__sg) return;", _read(os.path.join(WEB, "neu", "views", "mehr-chat.js")))
+        self.assertIn("if (scSig === scanList.__sg) return;", _read(os.path.join(WEB, "neu", "views", "kameras.js")))
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
