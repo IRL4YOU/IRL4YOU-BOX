@@ -86,6 +86,10 @@
     App.on('swupdate', renderSw);
 
     T.add('sy-update', 'Updates', h('div', { class: 'stack', style: '--gap:var(--space-5)' }, swBox));
+    /* kleiner gelber Punkt am Reiter „Updates“, solange eine neue Version bereitliegt (wie am Menüpunkt System) */
+    const updTabDot = h('i', { class: 'dot tab-dot', hidden: true, 'aria-hidden': 'true' }); { const tb = T.list.querySelector('[aria-controls="sy-update"]'); if (tb) tb.append(updTabDot); }
+    const showTabDot = d => { if (d) updTabDot.hidden = !d.newer; };
+    App.on('swupdate', showTabDot); App.on('hdrupd', showTabDot);
     const uf = document.createElement('div'); uf.hidden = true;
 
     /* =================================================================
