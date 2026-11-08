@@ -208,6 +208,13 @@
   .hdots { display: inline-flex; gap: 0.375rem; }
   .hdot { width: 0.75rem; height: 0.75rem; border-radius: 50%; background: var(--text-3); }
   .hdot[data-tone="ok"] { background: var(--ok); } .hdot[data-tone="warn"] { background: var(--warn); } .hdot[data-tone="danger"] { background: var(--danger); }
+  /* Hinweis „Neue Version“: kleiner gelber Punkt, der sanft ausläuft (Klick führt zu den Updates) */
+  .upd-dot { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+  .upd-dot[hidden] { display: none; }
+  .upd-dot > span { width: 0.625rem; height: 0.625rem; border-radius: 50%; background: var(--warn); animation: updPulse 2.6s ease-out infinite; }
+  .upd-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  @keyframes updPulse { 0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--warn) 60%, transparent); } 70%, 100% { box-shadow: 0 0 0 0.6rem transparent; } }
+  @media (prefers-reduced-motion: reduce) { .upd-dot > span { animation: none; } }
   #hb-go[data-variant="live"] { font-weight: var(--weight-bold); }
   #hb-go[data-dim] { opacity: .65; }
   #more-btn { display: none; }
