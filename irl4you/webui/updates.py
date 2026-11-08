@@ -25,6 +25,7 @@ class SwUpdate:
     CHECK_WAIT = 20            # so lange nach einer Anfrage nicht gleich noch eine stellen
     STALE = 60 * 60            # ist die letzte Prüfung älter (oder fehlt sie nach dem Start), stößt das Öffnen der Karte eine neue an
     AUTO_WAIT = 15 * 60        # solche selbstständigen Anfragen höchstens alle 15 Minuten, auch wenn die Prüfung scheitert (kein Netz)
+    PENDING_WAIT = 90          # steht ein neuer Stand nur noch wegen der GitHub-Prüfung aus: nach 90 s wieder fragen (so lange dauert die Prüfung nur wenige Minuten)
     HEX_RE = re.compile(r"^[0-9a-f]{7,40}$")
     ID_RE = re.compile(r"^[0-9a-f]{12}$")
 
@@ -82,9 +83,10 @@ class SwUpdate:
             alt = time.time() - float(st.get("checked") or 0)
         except (TypeError, ValueError):
             alt = self.STALE + 1
-        veraltet = alt > self.STALE
+        wartet = bool(st.get("pending"))
+        veraltet = alt > (self.PENDING_WAIT if wartet else self.STALE)
         jetzt = time.time()
-        frei = jetzt - self.asked > self.CHECK_WAIT if force else jetzt - self.asked_auto > self.AUTO_WAIT
+        frei = jetzt - self.asked > self.CHECK_WAIT if force else jetzt - self.asked_auto > (self.PENDING_WAIT if wartet else self.AUTO_WAIT)
         if (force or veraltet) and st.get("state") not in ("installing", "checking") and frei and (force or not self.send._active()) \
                 and os.path.exists(self.HELPER):
             if force:
@@ -217,6 +219,7 @@ class SwUpdate:
                "latest_version": lv if latest and re.match(r"^\d{1,4}\.\d{1,4}\.\d{1,4}(-[a-z0-9.]{1,20})?$", lv) else "", "notes": str(chk.get("notes") or "")[:4000] if chk.get("available") else "",
                "error": "", "checked_at": chk.get("checked") or chk.get("checked_at"),
                "newer": bool(latest and chk.get("available")),
+               "pending": bool(latest and chk.get("pending") and not chk.get("available")),
                "state": state if state in ("installing", "done", "rolledback", "failed", "refused") else "idle",
                "step": st.get("step", "") if isinstance(st.get("step"), str) else "", "message": str(st.get("message", ""))[:300],
                "frm": st.get("frm", ""), "to": st.get("to", ""), "progress": self._pct(st),
