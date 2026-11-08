@@ -41,7 +41,7 @@ Die Box ruft diese Dienste von Dritten auf. Sie gehören ihren Betreibern; Nutzu
 - **Tailscale** (optional): Fernzugriff, den man selbst einrichtet.
 - **Ubuntu-Paketquellen und PyPI**: Systempakete und Python-Bibliotheken bei Installation und Updates.
 - **Moblin, Streamer.bot** (nur Links/Anbindung): Moblin-App und DJI-Ablauf nach [Moblin](https://github.com/eerimoq/moblin); die Apps selbst sind nicht enthalten.
-- **[Mobcam](https://github.com/eerimoq/mobcam)** von Erik Moqvist (GPL-2.0): iPhone mit Moblin per USB-Kabel als Kamera. Das Programm ist nicht im Repository; die Einrichtung lädt und baut es (mit einem kleinen Patch für mehrere Kerne).
+- **[Mobcam](https://github.com/eerimoq/mobcam)** von Erik Moqvist (GPL-2.0): iPhone mit Moblin per USB-Kabel als Kamera. Die Box spricht das Mobcam-Protokoll selbst (eigene Umsetzung, kein Mobcam-Code) und reicht Bild und Ton unverändert weiter.
 
 ### Danksagung
 
@@ -92,7 +92,7 @@ The box calls these third-party services. They belong to their operators; use is
 - **Tailscale** (optional): remote access that you set up yourself.
 - **Ubuntu package sources and PyPI**: system packages and Python libraries during installation and updates.
 - **Moblin, Streamer.bot** (links/integration only): the Moblin app and the DJI procedure after [Moblin](https://github.com/eerimoq/moblin); the apps themselves are not included.
-- **[Mobcam](https://github.com/eerimoq/mobcam)** by Erik Moqvist (GPL-2.0): an iPhone running Moblin as a camera over USB. The program is not in the repository; the setup downloads and builds it (with a small patch for multi-core decoding).
+- **[Mobcam](https://github.com/eerimoq/mobcam)** by Erik Moqvist (GPL-2.0): an iPhone running Moblin as a camera over USB. The box speaks the Mobcam protocol itself (own implementation, no Mobcam code) and passes picture and sound through unchanged.
 
 ### Acknowledgements
 

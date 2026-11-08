@@ -12,9 +12,9 @@ IRL4YOU Box besteht aus eigenem Code (CC BY-ND 4.0, siehe `LICENSE` und `ZUSATZE
 | Lüfterregelung `irl4you/install/fan/`, Firmware-Werkzeug `irl4you/install/bootloader/irl4you-bootloader.sh`, RTMPS-Zertifikat `irl4you/install/rtmps/` | eigene Entwicklung | CC BY-ND 4.0 |
 | DJI-Kopplung `irl4you/dji_daemon.py`, `dji.py` | Ablauf und Nachrichtenformat nach Moblin (siehe unten), DJI-Dienst von Bittersweet1987 | CC BY-ND 4.0, Moblin-Ablauf unter MIT (Hinweis unten) |
 
-## Mobcam (GPL-2.0)
+## Mobcam (Protokoll)
 
-Die Quelle „Mobcam“ (iPhone per USB-Kabel als Kamera) nutzt das Programm `mobcam-virtualcam` aus [eerimoq/mobcam](https://github.com/eerimoq/mobcam) (GPL-2.0). Es ist nicht im Repository enthalten: `irl4you/install/mobcam/mobcam-setup.sh` (läuft beim Update) lädt den Quelltext der Version 1.0.0 (Prüfsumme wird geprüft), wendet den kleinen Patch `mobcam-threads.patch` an (mehrere Kerne zum Dekodieren) und baut ihn auf der Box. Der Patch steht unter derselben Lizenz wie das Programm.
+Die Quelle „Mobcam“ (iPhone mit Moblin per USB-Kabel als Kamera) spricht das Mobcam-Protokoll des Projekts [eerimoq/mobcam](https://github.com/eerimoq/mobcam) von Erik Moqvist (GPL-2.0; die App Moblin selbst: MIT). `irl4you/mobcam_rtmp.py` ist eine eigene Umsetzung des Nachrichtenformats in Python; Programmcode aus Mobcam ist nicht enthalten, das Programm `mobcam-virtualcam` wird nicht verwendet. Die USB-Verbindung stellt `usbmuxd` (LGPL-2.1/GPL-2.0) her.
 
 IRL4YOU Box ist kein Produkt von Radxa, Orange Pi, Rockchip oder DJI.
 
