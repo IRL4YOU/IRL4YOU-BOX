@@ -305,6 +305,12 @@ class TestFusszeileUndLinks(unittest.TestCase):
             if "aria-label" in t:
                 self.assertIn("title=", t, t[:120])
 
+    def test_hilfetexte_werden_vor_dem_zeichnen_ausgeblendet(self):
+        # sonst blitzt der Hilfetext einer neu gebauten Karte einige Bilder lang auf und schiebt den Inhalt (das Flackern)
+        h = _read(os.path.join(WEB, "neu", "hilfe.js"))
+        self.assertNotIn("setTimeout(() => { queued = false; scan(); }, 40)", h)
+        self.assertIn("if (n.nodeType === 1) { scan(); return; }", h)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
