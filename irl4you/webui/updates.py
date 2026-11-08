@@ -170,7 +170,7 @@ class SwUpdate:
             return s
         pos = {str(r.get("commit") or r["version"])[:12]: i for i, r in enumerate(rels)}
         cur_pos = pos.get(cur)
-        for r in rels:
+        for r in rels[:15]:         # die Auswahl zeigt die neuesten 15; die Liste „Alle Änderungen“ (history) nutzt alle
             full = str(r.get("commit") or r["version"])
             rid = full[:12]
             seen.add(rid)
