@@ -323,6 +323,14 @@ class TestFusszeileUndLinks(unittest.TestCase):
         self.assertIn("if (scanBtn.__t !== scT)", _read(os.path.join(WEB, "neu", "views", "kameras.js")))
         self.assertIn("if (sg === uaCard.__sg) return;", _read(os.path.join(WEB, "neu", "views", "zugriff.js")))
 
+    def test_update_suche_ohne_hinweisfenster(self):
+        # das Ergebnis der Suche steht in der Update-Karte; kein kleines Hinweisfenster unten rechts
+        sysjs = _read(os.path.join(WEB, "neu", "views", "system.js"))
+        i = sysjs.index("async function swCheck()")
+        fn = sysjs[i:sysjs.index("\n    }\n", i)]
+        self.assertNotIn("toast(", fn)
+        self.assertIn("swNote = { t0,", fn)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
