@@ -8,6 +8,8 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - Update-Prüfung alle 2 Stunden mit niedrigster Priorität; „Nach Updates suchen“ wartet auf das Ergebnis, auch während der Sendung.
 - Vorschau läuft flüssig, Passwortanzeige und Bluetooth-Einrichtung korrigiert.
 - Ansicht „Handy“ auch für die neue Oberfläche; Hinweis auf neue Versionen als kleiner Punkt; niedrigste Bitrate mindestens 450 kbit/s, Latenz mindestens 1000 ms.
+- Während ein Update installiert wird, kann nicht live gegangen werden; ein hängendes Update lässt sich abbrechen (erst nach 5 Minuten Stillstand, nie beim Umschalten); ein unterbrochenes Update wird erkannt.
+- Weniger Flackern der Seiten; „Alle Änderungen“ zeigt die letzten 50 Stände.
 
 ## 0.4
 - Erste veröffentlichte Version der IRL4YOU Box: fertige Images für Orange Pi 5 Plus und Rock 5B+.
