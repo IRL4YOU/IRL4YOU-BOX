@@ -36,8 +36,8 @@
     $$(SEL + ', p.muted', views).forEach(el => { if (el.hasAttribute('data-help')) { paint(el); return; } if (isHelp(el)) { el.setAttribute('data-help', ''); paint(el); } });
     $$('.card', views).forEach(decorate); sync();
   }
-  let queued = false;
-  new MutationObserver(() => { if (!queued) { queued = true; setTimeout(() => { queued = false; scan(); }, 40); } }).observe(views, { childList: true, subtree: true });
+  /* Sofort, nicht verzögert: Ein Beobachter läuft vor dem nächsten Zeichnen. Mit 40 ms Verzögerung war der Hilfetext einer neu gebauten Karte einige Bilder lang sichtbar und schob alles darunter weg (das Flackern). */
+  new MutationObserver(recs => { for (const r of recs) for (const n of r.addedNodes) if (n.nodeType === 1) { scan(); return; } }).observe(views, { childList: true, subtree: true });
   mq.addEventListener('change', scan);
   document.addEventListener('neu:view', () => setTimeout(scan, 40));
 
