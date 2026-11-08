@@ -140,7 +140,7 @@
 
     /* ---------- Systemdetails ---------- */
     const detBox = h('div', { class: 'stack' });
-    const det = disclosure('Systemdetails (Sendung, Prozessor, Temperaturen, Speicher)', detBox); det.addEventListener('toggle', () => { if (det.open) renderDet(); });
+    const det = disclosure('Anzeigen', detBox); det.addEventListener('toggle', () => { if (det.open) renderDet(); });
     const f1 = x => x == null || x < 0 ? '–' : (+x).toFixed(1), n0 = x => x == null || x < 0 ? '–' : String(Math.round(x));
     function renderDet() {
       if (!det.open) return; const m = App.data.metrics; if (!m) return; const d = m.details || {}, s = d.send, kids = [];
@@ -166,7 +166,7 @@
       ['vorschau', 'Vorschau', [card({ title: 'Vorschau', actions: [prevGear, prevBtn], body: [prevOpt, prevBox] })], 'a', true],
       ['steuerung', 'Bild und Ton jetzt (erscheint während der Sendung)', [liveCtlCard], 'a', true],
       ['deck', 'Deck', [Neu.chat.deckFrameCard()], 'a', true],
-      ['details', 'Systemdetails', [h('section', { class: 'card' }, h('div', { class: 'card__body' }, det))], 'a', true],
+      ['details', 'Systemdetails', [card({ title: 'Systemdetails', sub: 'Sendung, Prozessor (jeder Kern), Temperaturen und Speicher.', body: det })], 'a', true],
       ['meldungen', 'Meldungen', [alerts], 'b', true],
       ['leitungen', 'Leitungen', [linkCard('Leitungen', 'netz', linesBody)], 'b', true],
       ['kameras', 'Kameras', [linkCard('Kameras', 'kameras', camsBody)], 'b', true],
