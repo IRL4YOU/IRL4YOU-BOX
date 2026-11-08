@@ -3,7 +3,7 @@
 Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y steigt nur, wenn Marco ein Release ausruft (dann wird VERSION auf "x.y" geändert). z ist die Zahl der Commits seit dem letzten Release und wird vom Updater beim Installieren aus GitHub gezählt (VERSION enthält nur "x.y"). Die Box folgt weiterhin den Commits von main; die Nummer ist nur der Anzeigename.
 
 ## 0.5
-- Mobcam: iPhone mit Moblin per USB-Kabel als Kamera (Kameras > HDMI und USB > Quelle „Mobcam“), Bild und Ton gehen unverändert durch (H.264 oder H.265, kaum Rechenzeit).
+- Mobcam: iPhone mit Moblin per USB-Kabel als Kamera (Kameras > HDMI und USB > Quelle „Mobcam“), Bild und Ton gehen unverändert durch (H.264 oder H.265, kaum Rechenzeit); Ströme über 12 Mbit/s werden abgelehnt, in Moblin höchstens 10 Mbit/s einstellen.
 - Testbild als Kamera-Quelle: bewegtes Wellenmuster mit Schrift, Zeit und Logo, Stereo-Testton (links 440, rechts 660 Hz).
 - Leitungstest: „Testen“ je Leitung und „Alle Leitungen testen“ (Herunterladen, Hochladen, Antwortzeit, auch während der Sendung).
 - Update-Prüfung alle 2 Stunden mit niedrigster Priorität; „Nach Updates suchen“ wartet auf das Ergebnis, auch während der Sendung.
