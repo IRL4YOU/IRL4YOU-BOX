@@ -184,6 +184,19 @@ class TestFusszeileUndLinks(unittest.TestCase):
         i = r.index("self.phone_view_wanted()")
         self.assertIn("self.authed()", r[i - 120:i])
 
+    def test_update_hinweis_in_der_kopfzeile(self):
+        # "Update verfügbar" steht auf jeder Seite oben, mit eigener seltener Abfrage (die Update-Karte fragt erst auf der Seite System)
+        index = _read(os.path.join(WEB, "neu", "index.html"))
+        self.assertIn('id="hb-upd"', index)
+        self.assertIn('class="upd-dot" id="hb-upd"', index)          # nur ein kleiner gelber Punkt, kein großer Knopf
+        css = _read(os.path.join(WEB, "neu", "app.css"))
+        self.assertIn("@keyframes updPulse", css)
+        self.assertIn(".upd-dot > span { width: 0.625rem;", css)
+        kopf = _read(os.path.join(WEB, "neu", "kopf.js"))
+        self.assertIn("Neu.poll('hdrupd', '/api/swupdate', 300000)", kopf)
+        self.assertIn("App.on('hdrupd', show); App.on('swupdate', show);", kopf)
+        self.assertIn("Neu.goto('system', 'sy-update')", kopf)
+
     def test_leitungstest_ist_in_oberflaeche_und_server_da(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertIn("const CAN_TEST = true;", netz)
@@ -192,10 +205,15 @@ class TestFusszeileUndLinks(unittest.TestCase):
 
 
 class TestLatenzRegler(unittest.TestCase):
+    def test_niedrigste_bitrate_nicht_unter_450(self):
+        netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
+        self.assertIn("label: 'Niedrigste Bitrate', min: 450, max: 2000, step: 50", netz)
+        self.assertIn('"min_kbps": 450,', _read(os.path.join(IRL, "webui", "netstate.py")))
+
     def test_latenz_ist_ein_sichtbarer_regler_mit_standard_4000(self):
         netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
         self.assertNotIn("disclosure('Erweitert'", netz)
-        self.assertIn("label: 'Latenz', min: 500, max: 8000, step: 100", netz)
+        self.assertIn("label: 'Latenz', min: 1000, max: 8000, step: 100", netz)
         self.assertIn("draft.latency_ms || 4000", netz)
         self.assertIn("Standard: 4000 ms", netz)
         # die Box selbst startet mit 4000 ms und nimmt nur Werte aus ihrem erlaubten Bereich
