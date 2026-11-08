@@ -63,6 +63,18 @@
     drawDots(m); draw(); paint();
   });
   App.on('send', paint);
+
+  /* Hinweis „Update verfügbar“ in der Kopfzeile, auf jeder Seite: eigene seltene Abfrage (alle 5 Minuten); auf der Seite System kommen die Daten der Update-Karte dazu */
+  const upd = $('#hb-upd');
+  if (upd) {
+    const show = d => {
+      if (!d) return; upd.hidden = !d.newer;
+      if (d.newer) { const t = 'Neue Version ' + (d.latest_version ? 'v' + d.latest_version + ' ' : '') + 'verfügbar (jetzt v' + d.current + '). ' + (d.sending ? 'Einspielen geht nicht während der Übertragung.' : 'Zum Software-Update.'); upd.title = t; upd.setAttribute('aria-label', t); }
+    };
+    upd.addEventListener('click', () => Neu.goto('system', 'sy-update'));
+    Neu.poll('hdrupd', '/api/swupdate', 300000);
+    App.on('hdrupd', show); App.on('swupdate', show);
+  }
   setInterval(() => {
     if (document.hidden || !lastM) return;
     const stale = okAt > 0 && Date.now() - okAt > 8000; sig.classList.toggle('stale', stale);
