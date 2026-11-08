@@ -62,6 +62,11 @@
   .row .field { flex: 1; }
   .row.stackrow { align-items: stretch; flex-direction: column; gap: var(--space-3); }
   .row__end .select { width: min(15rem, 50vw); }
+  /* Listenzeilen in jeder Breite: Der Text bekommt immer Platz; was rechts steht, rutscht bei Platzmangel in die nächste Zeile unter den Text (auch in der schmalen Spalte neben dem Chat) */
+  .row { flex-wrap: wrap; row-gap: var(--space-2); }
+  .row__main { flex: 1 1 9rem; }
+  .row__end { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
+  .row__title, .row__desc { overflow-wrap: anywhere; }
   .chat { display: grid; gap: var(--space-2); font-size: var(--text-sm); max-height: 16rem; overflow: auto; }
   .chat time { color: var(--text-3); margin-right: var(--space-2); font-size: var(--text-xs); }
   .chat b { color: var(--accent-text); }
@@ -102,11 +107,6 @@
     .hero .btn { width: 100%; }
     .toasts { inset: auto var(--space-4) 5rem var(--space-4); justify-items: stretch; }
     .grabber { display: block; width: 2.5rem; height: 4px; border-radius: 2px; background: var(--border-strong); margin: var(--space-2) auto 0; }
-    /* Listenzeilen: Der Text bekommt immer Platz; was rechts steht, rutscht bei Platzmangel in die nächste Zeile unter den Text */
-    .row { flex-wrap: wrap; row-gap: var(--space-2); }
-    .row__main { flex: 1 1 9rem; }
-    .row__end { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
-    .row__title, .row__desc { overflow-wrap: anywhere; }
     /* Reiter innerhalb einer Seite: sichtbar nebeneinander in Zeilen, kein seitliches Wischen */
     .tabs { flex-wrap: wrap; overflow: visible; border-bottom: 0; gap: var(--space-2); padding-bottom: var(--space-2); }
     .tab { margin: 0; padding: 0 var(--space-3); min-height: 2.5rem; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--surface-1); }
