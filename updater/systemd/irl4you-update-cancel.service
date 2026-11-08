@@ -1,0 +1,8 @@
+[Unit]
+Description=IRL4YOU Update abbrechen (nur wenn es hängt)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/irl4you-update cancel
+TimeoutStartSec=2min
+Nice=5

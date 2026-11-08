@@ -1,0 +1,9 @@
+[Unit]
+Description=Auslöser zum Abbrechen eines hängenden Updates
+
+[Path]
+PathExists=/var/lib/pipbox/swupdate-cancel
+Unit=irl4you-update-cancel.service
+
+[Install]
+WantedBy=multi-user.target
