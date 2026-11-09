@@ -48,6 +48,12 @@ IRLCAM_APP_TEXT = "Warte auf die App: am Handy IRL4YOU Cam öffnen (beim ersten 
 IRLCAM_PHONE_TEXT = "Kein Android-Handy angeschlossen (USB-Datenkabel, Handy entsperren)"
 IRLCAM_SWITCH_TEXT = "Das Handy wird für die App vorbereitet (Handy entsperren, USB-Kabel prüfen)"
 MOBCAM_WAIT = "Warte auf Moblin"
+PHONE_LINE_RE = re.compile(r"^Handy: (\{.*\})$")                     # Zeile des Hilfsprogramms mit Akku, Laden, Strom und Temperatur des Handys
+PHONE_FRESH_S = 15.0                                                   # so lange gelten die Handydaten nach der letzten Zeile als aktuell
+PHONE_HIST_S = 60.0                                                    # Abstand der Punkte im Akkuverlauf der Kachel
+PHONE_HIST_MAX = 360                                                   # so viele Punkte bleiben erhalten (6 Stunden)
+PHONE_HIST_GAP_S = 600.0                                               # länger ohne Werte: neuer Verlauf (anderes Handy oder lange Pause)
+PHONE_LOG_S = 300.0                                                    # so oft steht der Handystand im Journal (und bei jedem Wechsel Laden/nicht Laden)
 MOBCAM_FORMAT_RE = re.compile(r"^Bild: (\d+)x(\d+) (HEVC|H\.264)(?: (\d+) fps)?\b")      # Zeile des Hilfsprogramms, sobald das Handy Bild liefert
 MOBCAM_TOO_HIGH = "Die Bitrate der Mobcam ist zu hoch. Bitte in Moblin höchstens 10 Mbit/s einstellen."
 MOBCAM_PHONE_TEXT = "Kein iPhone angeschlossen (USB-Datenkabel, iPhone entsperren, „Vertrauen“ tippen)"
@@ -484,6 +490,7 @@ class Daemon:
         self._probe_run = probe or self._probe_process
         self.usb = {"present": False, "name": "", "node": "", "format": "", "audio": "", "power": False}
         self.mobcam_fmt = ""
+        self.phone, self.phone_logged, self.phone_hist = None, -1e9, []
         self.irl_seen = None
         self.usb_choice = None
         self.usb_bad = set()
@@ -667,6 +674,41 @@ class Daemon:
             *argv, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
             preexec_fn=lambda: os.nice(NICE))
 
+    def _phone_seen(self, raw):
+        try:
+            d = json.loads(raw)
+        except ValueError:
+            return
+        if not isinstance(d, dict) or not d:
+            return
+        now = self.clock()
+        first, chg_old = self.phone is None, (self.phone or {}).get("chg")
+        self.phone = dict(d, _t=now)
+        if isinstance(d.get("bat"), (int, float)) and not isinstance(d.get("bat"), bool):
+            if self.phone_hist and now - self.phone_hist[-1][0] > PHONE_HIST_GAP_S:
+                self.phone_hist.clear()
+            if not self.phone_hist or now - self.phone_hist[-1][0] >= PHONE_HIST_S:
+                self.phone_hist.append((now, int(d["bat"])))
+                del self.phone_hist[:-PHONE_HIST_MAX]
+        if first or d.get("chg") != chg_old or now - self.phone_logged >= PHONE_LOG_S:
+            self.phone_logged = now
+            log.info("IRL4YOU Cam: Handy %s", ", ".join(x for x in (
+                "Akku %s %%" % d["bat"] if "bat" in d else "", ("lädt" if d["chg"] else "lädt nicht") if "chg" in d else "",
+                "%s mA" % d["cur"] if "cur" in d else "", "%s °C" % d["temp"] if "temp" in d else "",
+                "Hitzestufe %s" % d["thermal"] if d.get("thermal") else "") if x))
+
+    def phone_now(self):
+        """Handydaten für die Anzeige: nur mit angestecktem Handy, laufender Einspeisung und frischen Werten, sonst None (die Kachel verschwindet)"""
+        if self.cfg.get("source") != "irlcam" or not self.usb.get("present") or self.proc is None or not self.phone:
+            return None
+        if self.clock() - self.phone["_t"] > PHONE_FRESH_S:
+            return None
+        out = {k: v for k, v in self.phone.items() if k != "_t"}
+        if len(self.phone_hist) >= 2:
+            now = self.clock()
+            out["hist"] = [[int(now - t), b] for t, b in self.phone_hist]      # Sekunden seit dem Punkt, Akku in %
+        return out
+
     async def _drain(self, proc):
         try:
             while True:
@@ -675,6 +717,9 @@ class Daemon:
                     break
                 text = line.decode("utf-8", "replace").strip()
                 self.tail.append(text)
+                p = PHONE_LINE_RE.match(text)
+                if p:
+                    self._phone_seen(p.group(1))
                 m = MOBCAM_FORMAT_RE.match(text)
                 if m:
                     self.mobcam_fmt = "%s×%s %s%s" % (m.group(1), m.group(2), "HEVC" if m.group(3) == "HEVC" else "H.264", " %s fps" % m.group(4) if m.group(4) else "")
@@ -719,6 +764,7 @@ class Daemon:
                                find_extra_audio(self.cfg.get("audio"), self.asound))
         self.tail.clear()
         self.mobcam_fmt = ""
+        self.phone, self.phone_logged = None, -1e9
         try:
             self.proc = await self._spawn(argv)
         except Exception as e:
@@ -855,6 +901,9 @@ class Daemon:
         s = {"ok": True, "available": self.available, "state": self.state, "message": self.message, "settings": dict(self.cfg), "usb": dict(self.usb),
              "signal": {k: self.signal[k] for k in ("plugged", "locked", "width", "height", "fps", "interlaced", "format", "depth")},
              "signal_known": self.signal_known, "publishing": self.published, "restarts": self.restarts}
+        ph = self.phone_now()
+        if ph:
+            s["phone"] = ph
         return s
 
     async def handle(self, req):
