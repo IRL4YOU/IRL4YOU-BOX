@@ -31,6 +31,8 @@ class PipelineBuild:
             num(k, 0, 1000)
         for k in ("main_delay_ms", "pip_delay_ms", "pip2_delay_ms", "pip3_delay_ms"):
             num(k, 0, 3000)
+        out.setdefault("mic_offset_ms", 0)
+        num("mic_offset_ms", 0, pipbox_live.MIC_OFFSET_MAX)
         out["type"] = "pip" if out.get("type") == "pip" else "single"
         out["swap_cams"] = 4 if out["type"] == "pip" else 0
         out["always_ready"] = out["type"] == "pip"
@@ -221,6 +223,9 @@ class PipelineBuild:
         audio_sel = c.get("audio", "main") if pip else "main"
         if audio_sel == "pip2" and not pip2 or audio_sel == "pip3" and not pip3 or audio_sel not in ("main", "pip", "pip2", "pip3"):
             audio_sel = "main"
+        mic = pipbox_live.mic_device() if c.get("audio") == "mic" else None      # Ton vom USB-Mikrofon (fehlt die Tonkarte: Ton der Kamera)
+        if mic:
+            audio_sel = "mic"
         main_audio = audio_sel == "main"
         mute = "queue max-size-buffers=4 leaky=downstream ! fakesink sync=false async=false\n"
         def small_audio(demux, sel):
@@ -228,7 +233,13 @@ class PipelineBuild:
                 return (f"{demux}.audio !\n{q} !\naacparse ! avdec_aac ! "
                         f"{opus} ! {q} ! mux.\n")
             return f"{demux}.audio !\n{mute}"
-        if main_audio:
+        if mic:
+            off = pipbox_live.mic_offset_ms(c)
+            out.append("demux.audio !\nqueue max-size-buffers=4 leaky=downstream ! fakesink sync=false async=false\n")
+            out.append(f"alsasrc device={mic} provide-clock=false slave-method=resample !\naudioconvert ! audioresample ! "
+                       f"audio/x-raw,rate=48000,channels=2 !\nqueue max-size-time={(off + 2000) * 1000000} max-size-buffers=0 max-size-bytes=0"
+                       + (f" min-threshold-time={off * 1000000}" if off else "") + f" !\n{opus} ! {q} ! mux.\n")
+        elif main_audio:
             out.append(f"demux.audio !\n{qa} !\naacparse ! avdec_aac ! "
                        f"{opus} ! {q} ! mux.\n")
         else:

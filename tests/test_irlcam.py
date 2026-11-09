@@ -615,6 +615,199 @@ class TestIrlcamHilfsprogramm(unittest.TestCase):
         self.assertTrue(irl("hdmi_daemon").PHONE_LINE_RE.match(z[0]))
 
 
+def _adts(payload, sri=3, ch=2, profile=1):
+    n = 7 + len(payload)
+    return bytes([0xFF, 0xF1, (profile << 6) | (sri << 2) | (ch >> 2), ((ch & 3) << 6) | (n >> 11), (n >> 3) & 0xFF, ((n & 7) << 5) | 0x1F, 0xFC]) + payload
+
+
+class TestUsbMikrofon(unittest.TestCase):
+    """Ton vom USB-Mikrofon (DJI-Empfänger o. ä.) statt vom Handy: AAC von der Tonkarte, Zeitstempel auf der Zeitachse des Bilds, Ton-Versatz."""
+
+    def setUp(self):
+        self.hd = irl("hdmi_daemon")
+
+    def _session(self, offset=0):
+        args = types.SimpleNamespace(key="hdmi", rtmp_port=1935, rtmp_app="publish", audio="usb", dry=False, audio_offset=offset)
+        s = ac.Session(FakeAcc(), args)
+        s.m = mr
+        s.rtmp = FakeRtmp()
+        s.last = {"v": 1000, "a": 0}
+        s.last_v_sent = 100.0
+        return s
+
+    def test_adts_wird_zerlegt_auch_in_stuecken(self):
+        a, b, c = b"A" * 100, b"B" * 7, b"C" * 300
+        strom = _adts(a) + _adts(b) + _adts(c)
+        frames, rest = ac.adts_split(strom[:110])
+        self.assertEqual([f[0] for f in frames], [a])
+        self.assertTrue(rest)
+        frames2, rest2 = ac.adts_split(rest + strom[110:])
+        self.assertEqual([f[0] for f in frames2], [b, c])
+        self.assertEqual(rest2, b"")
+        self.assertEqual(frames[0][1], bytes([0x11, 0x90]))                           # AudioSpecificConfig AAC-LC, 48 kHz, Stereo
+        self.assertEqual(frames[0][2], 48000)
+        frames3, _ = ac.adts_split(b"\x00\xff\x12\x34" + _adts(a))                      # Müll vor dem Rahmen wird übersprungen
+        self.assertEqual([f[0] for f in frames3], [a])
+
+    def test_tonkarte_wird_gefunden(self):
+        d = tempfile.mkdtemp()
+        self.assertIsNone(ac.usb_capture_card(d))
+        _write(os.path.join(d, "card0", "id"), "rockchipes8388")                      # eingebaut, kein USB
+        os.makedirs(os.path.join(d, "card0", "pcm0c"))
+        _write(os.path.join(d, "card1", "usbbus"), "007/002")                           # USB, aber nur Wiedergabe
+        _write(os.path.join(d, "card1", "id"), "Spk")
+        os.makedirs(os.path.join(d, "card1", "pcm0p"))
+        self.assertIsNone(ac.usb_capture_card(d))
+        _write(os.path.join(d, "card5", "usbbus"), "007/002")
+        _write(os.path.join(d, "card5", "id"), "Rx")
+        os.makedirs(os.path.join(d, "card5", "pcm0c"))
+        self.assertEqual(ac.usb_capture_card(d), "plughw:CARD=Rx")
+        _write(os.path.join(d, "card5", "id"), "böse; rm")                              # ungültige Kennung: nicht nehmen
+        self.assertIsNone(ac.usb_capture_card(d))
+
+    def test_aufruf_der_aufnahme(self):
+        a = ac.usb_audio_argv("plughw:CARD=Rx")
+        self.assertEqual(a[:4], ["gst-launch-1.0", "-q", "alsasrc", "device=plughw:CARD=Rx"])
+        self.assertIn("voaacenc", a)
+        self.assertIn("audio/mpeg,mpegversion=4,stream-format=adts", a)
+        self.assertEqual(a[-2:], ["fdsink", "fd=1"])
+        with self.assertRaises(ValueError):
+            ac.usb_audio_argv("plughw:CARD=Rx; rm -rf /")
+
+    def test_zeitstempel_folgen_dem_bild_mit_versatz(self):
+        s = self._session(offset=50)
+        s.on_mic_frame(b"r1", bytes([0x11, 0x90]), 48000, 100.5)                       # 0,5 s nach dem letzten Bild: 1000 + 500 + 50
+        s.on_mic_frame(b"r2", bytes([0x11, 0x90]), 48000, 100.5213)
+        s.on_mic_frame(b"r3", bytes([0x11, 0x90]), 48000, 100.5427)
+        audio = [x for x in s.rtmp.sent if x[0] == "audio"]
+        self.assertEqual(audio[0][2], mr.flv_audio(0, bytes([0x11, 0x90])))             # erst der Kopf der Tonspur
+        self.assertEqual([x[1] for x in audio[1:]], [1550, 1571, 1592])                 # lückenlos, 1024 Abtastwerte = 21,3 ms
+        self.assertEqual(audio[1][2], mr.flv_audio(1, b"r1"))
+        s.on_mic_frame(b"r4", bytes([0x11, 0x90]), 48000, 101.5)                        # 1 s Sprung: neu ansetzen statt nachzuhinken
+        self.assertEqual([x for x in s.rtmp.sent if x[0] == "audio"][-1][1], 2550)
+
+    def test_negativer_versatz_und_nie_rueckwaerts(self):
+        s = self._session(offset=-200)
+        s.on_mic_frame(b"r", bytes([0x11, 0x90]), 48000, 100.5)
+        self.assertEqual([x for x in s.rtmp.sent if x[0] == "audio"][-1][1], 1300)
+        s.last["a"] = 5000
+        s.on_mic_frame(b"r", bytes([0x11, 0x90]), 48000, 100.52)
+        self.assertGreaterEqual([x for x in s.rtmp.sent if x[0] == "audio"][-1][1], 5000)
+
+    def test_ohne_bild_oder_in_der_pause_kein_ton(self):
+        s = self._session()
+        s.last_v_sent = 0.0                                                             # noch kein Bild gesendet
+        s.on_mic_frame(b"r", bytes([0x11, 0x90]), 48000, 100.5)
+        s.last_v_sent = 100.0
+        s.hold_until = 999.0                                                            # Pause nach Umstellung
+        s.on_mic_frame(b"r", bytes([0x11, 0x90]), 48000, 100.5)
+        s.hold_until = 0.0
+        s.rtmp = None
+        s.on_mic_frame(b"r", bytes([0x11, 0x90]), 48000, 100.5)                         # kein RTMP-Strom
+        self.assertEqual(s.a_next, None)
+
+    def test_handyton_wird_im_usb_modus_verworfen(self):
+        s = self._session()
+        s.cfg = json.loads(_config())
+        s.acsd = b"\x11\x90"
+        s.handle(ac.MSG_AUDIO, struct.pack(">Q", 1000) + b"phone")
+        self.assertEqual([x for x in s.rtmp.sent if x[0] == "audio"], [])
+        self.assertTrue(s.has_audio())                                                  # Metadaten kündigen die Tonspur trotzdem an
+
+    def test_aufnahme_laeuft_weiter_nach_abziehen(self):
+        d = tempfile.mkdtemp()
+        _write(os.path.join(d, "card5", "usbbus"), "007/002")
+        _write(os.path.join(d, "card5", "id"), "Rx")
+        os.makedirs(os.path.join(d, "card5", "pcm0c"))
+        import io
+        got, starts = [], []
+
+        class P:
+            def __init__(self, data):
+                self.stdout = io.BytesIO(data)
+
+            def kill(self):
+                pass
+
+            def wait(self, timeout=None):
+                pass
+        sess = types.SimpleNamespace(closed=False, clock=lambda: 10.0, on_mic_frame=lambda raw, asc, rate, t: got.append((raw, asc, rate)))
+
+        def spawn(argv, **kw):
+            starts.append(argv)
+            return P(_adts(b"x" * 40) + _adts(b"y" * 40))
+        pausen = []
+
+        def sleep(sec):
+            pausen.append(sec)
+            if len(starts) >= 2:
+                sess.closed = True
+        ac.UsbMic(sess, asound=d, spawn=spawn, sleep=sleep).run()
+        self.assertEqual(len(starts), 2, "nach dem Abbruch (Ende der Daten) wird neu gestartet")
+        self.assertEqual(len(got), 4)
+        self.assertEqual(got[0], (b"x" * 40, bytes([0x11, 0x90]), 48000))
+        self.assertEqual(starts[0][3], "device=plughw:CARD=Rx")
+
+    def test_ohne_tonkarte_wird_gewartet(self):
+        d = tempfile.mkdtemp()
+        sess = types.SimpleNamespace(closed=False, clock=lambda: 0.0, on_mic_frame=lambda *a: None)
+        n = []
+
+        def sleep(sec):
+            n.append(sec)
+            if len(n) >= 3:
+                sess.closed = True
+        ac.UsbMic(sess, asound=d, spawn=lambda *a, **k: self.fail("ohne Tonkarte darf nichts starten"), sleep=sleep).run()
+        self.assertEqual(n, [2, 2, 2])
+
+    def test_einstellung_ton_versatz(self):
+        c = self.hd.clean_settings
+        self.assertEqual(c({})["audio_offset_ms"], 0)
+        self.assertEqual(c({"audio_offset_ms": -120})["audio_offset_ms"], -120)
+        self.assertEqual(c({"audio_offset_ms": 1000})["audio_offset_ms"], 1000)
+        for bad in (1001, -1001, 1.5, "5", True, None):
+            with self.assertRaises(ValueError, msg=repr(bad)):
+                c({"audio_offset_ms": bad})
+
+    def test_aufruf_helfer_mit_usb_ton(self):
+        cfg = dict(self.hd.DEFAULTS, source="irlcam", audio="usb", audio_offset_ms=-120, key="hdmi")
+        a = self.hd.irlcam_feeder_argv(cfg, 1935, "publish", helper="/opt/pipbox/android_cam.py")
+        self.assertEqual(a[-4:], ["--audio", "usb", "--audio-offset", "-120"])
+        self.assertEqual(self.hd.irlcam_feeder_argv(dict(cfg, audio="mobcam"))[-2:], ["--audio", "mobcam"])
+        self.assertEqual(self.hd.irlcam_feeder_argv(dict(cfg, audio="none"))[-2:], ["--audio", "none"])
+        self.assertEqual(self.hd.mobcam_feeder_argv(dict(cfg, source="mobcam"))[-2:], ["--audio", "mobcam"], "das iPhone-Hilfsprogramm kennt keinen USB-Ton")
+
+    def test_umstellen_der_quelle_haelt_den_ton_passend(self):
+        d = self.hd.Daemon(tempfile.mkdtemp(), device="/gibt/es/nicht")
+        d.cfg = dict(d.cfg, source="hdmi", audio="usb")
+        r = asyncio.run(d.handle({"cmd": "set", "settings": {"source": "irlcam"}}))
+        self.assertEqual((r["settings"]["source"], r["settings"]["audio"]), ("irlcam", "usb"), "USB-Mikrofon gilt auch bei der IRL4YOU Cam")
+        r = asyncio.run(d.handle({"cmd": "set", "settings": {"source": "mobcam"}}))
+        self.assertEqual((r["settings"]["source"], r["settings"]["audio"]), ("mobcam", "mobcam"), "beim iPhone nicht möglich")
+        d.cfg = dict(d.cfg, source="hdmi", audio="analog")
+        r = asyncio.run(d.handle({"cmd": "set", "settings": {"source": "irlcam"}}))
+        self.assertEqual(r["settings"]["audio"], "mobcam")
+
+    def test_versatz_bei_hdmi_und_webcam(self):
+        """Ton von der USB-Tonkarte: positiv = Ton wird gehalten, negativ = Bild wird gehalten; Ton der Kamera selbst bleibt unverändert."""
+        hd = self.hd
+        teile = lambda a: (a[2:a.index("alsasrc")], a[a.index("alsasrc"):a.index("flvmux")])
+        for audio, off, v_erw, a_erw in (("usb", 200, False, True), ("usb", -150, True, False), ("usb", 0, False, False), ("hdmi", 200, False, False),
+                                         ("analog", 300, False, True)):
+            cfg = dict(hd.DEFAULTS, audio=audio, audio_offset_ms=off)
+            a = hd.feeder_argv(cfg, extra_audio="plughw:CARD=Rx")
+            v, au = teile(a)
+            self.assertEqual(any(x.startswith("min-threshold-time=") for x in v), v_erw, (audio, off, "Bild"))
+            self.assertEqual(any(x.startswith("min-threshold-time=") for x in au), a_erw, (audio, off, "Ton"))
+        a = hd.feeder_argv(dict(hd.DEFAULTS, audio="usb", audio_offset_ms=200), extra_audio="plughw:CARD=Rx")
+        self.assertIn("min-threshold-time=200000000", a)
+        self.assertIn("max-size-time=1200000000", a)
+        cand = ("mjpeg", 1280, 720, 30)
+        u = hd.usb_feeder_argv(dict(hd.DEFAULTS, audio="usb", audio_offset_ms=-100), "/dev/video2", cand, "plughw:CARD=Rx")
+        self.assertIn("min-threshold-time=100000000", u[:u.index("alsasrc")])
+        self.assertFalse(any(x.startswith("min-threshold-time=") for x in u[u.index("alsasrc"):]))
+
+
 class TestIrlcamOberflaeche(unittest.TestCase):
     def test_auswahl_und_texte_stehen_da(self):
         def lesen(*p):

@@ -16,7 +16,7 @@ class PipelineStore(PipelineBuild):
     DEFAULT = {"type": "single", "main": "", "pip": "", "corner": 3, "size_pct": 25, "size_pct2": 25, "size_pct3": 25, "audio": "main",
                "pip2": "", "corner2": 2, "pip3": "", "corner3": 0, "x": 500, "y": 500, "x2": 500, "y2": 500, "x3": 500, "y3": 500, "main_delay_ms": DEFAULT_MAIN_DELAY_MS,
                "pip_delay_ms": DEFAULT_PIP_DELAY_MS, "pip2_delay_ms": DEFAULT_PIP_DELAY_MS,
-               "pip3_delay_ms": DEFAULT_PIP_DELAY_MS, "auto_failover": True, "swap_cams": 0, "always_ready": False, "facecam": ""}
+               "pip3_delay_ms": DEFAULT_PIP_DELAY_MS, "auto_failover": True, "swap_cams": 0, "always_ready": False, "facecam": "", "mic_offset_ms": 0}
     # Bildaufbau ist immer Bild-in-Bild; ohne kleines Bild (eine Kamera) bleibt der Typ "single". Mit kleinem Bild gilt immer "Alle Kameras immer bereit"
     # und der Tausch des Hauptbilds über alle Kameras (keine Einstellung mehr in der Oberfläche).
 
@@ -233,6 +233,15 @@ class PipelineStore(PipelineBuild):
                "pip3_delay_ms": DEFAULT_PIP_DELAY_MS, "auto_failover": req.get("auto_failover", True) is not False, "swap_cams": 0,
                "always_ready": t == "pip"}
         cfg["styles"] = clean_styles(req.get("styles"), self.cfg.get("styles"), strict=True)
+        try:
+            moff = int(req.get("mic_offset_ms", 0) or 0)
+        except (TypeError, ValueError):
+            raise ValueError("Ton-Versatz muss eine Zahl sein (Millisekunden)")
+        if not 0 <= moff <= pipbox_live.MIC_OFFSET_MAX:
+            raise ValueError("Ton-Versatz: 0 bis %d ms" % pipbox_live.MIC_OFFSET_MAX)
+        cfg["mic_offset_ms"] = moff
+        if req.get("audio") == "mic":                 # Ton vom USB-Mikrofon: gilt bei einer Kamera und bei Bild in Bild
+            cfg["audio"] = "mic"
         if t == "pip":
             cfg["swap_cams"] = 4
             pipk = str(req.get("pip", ""))
@@ -246,8 +255,8 @@ class PipelineStore(PipelineBuild):
             if corner not in range(len(pip_corners())) or not all(SIZE_MIN <= v <= SIZE_MAX for v in (pct, pct2, pct3)):
                 raise ValueError("Position aus der Liste wählen, Skalierung jedes kleinen Bildes %d bis %d Prozent" % (SIZE_MIN, SIZE_MAX))
             audio = req.get("audio", "main")
-            if audio not in ("main", "pip", "pip2", "pip3"):
-                raise ValueError("Ton: Hauptbild oder eines der kleinen Bilder")
+            if audio not in ("main", "pip", "pip2", "pip3", "mic"):
+                raise ValueError("Ton: Hauptbild, eines der kleinen Bilder oder das Mikrofon")
             cfg.update(pip=pipk, corner=corner, size_pct=pct, size_pct2=pct2, size_pct3=pct3, audio=audio)
             for key in ("x", "y", "x2", "y2", "x3", "y3"):
                 try:
@@ -366,7 +375,7 @@ def view_only_change(a, b):
         c = dict(c)
         c.pop("facecam", None)
         c.pop("rotation", None)
-        c["audio"] = "main"
+        c["audio"] = "mic" if c.get("audio") == "mic" else "main"        # zum oder vom Mikrofon wechseln ändert die Kette: nicht nur die Ansicht
         c["styles"] = clean_styles(c.get("styles"))
         for k in STYLE_SLOTS:
             c["styles"][k] = dict(c["styles"][k], visible=True)
@@ -387,6 +396,8 @@ def always_compatible(a, b):
         for k in STYLE_SLOTS:
             c["styles"][k] = dict(c["styles"][k], visible=True)
         return c
+    if (a.get("audio") == "mic") != (b.get("audio") == "mic"):
+        return False                                  # der Mikrofon-Eingang steckt nur in einer neu gebauten Kette: Neustart
     if pipbox_live.supported() and a.get("type") == "pip" and b.get("type") == "pip" and a.get("always_ready") is True and b.get("always_ready") is True:
         return True
     return a.get("type") == "pip" and b.get("type") == "pip" and a.get("always_ready") is True and b.get("always_ready") is True and norm(a) == norm(b)

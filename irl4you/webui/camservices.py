@@ -340,7 +340,7 @@ class HdmiService:
     MOBCAM_NAMES = ("Mobcam", "Mobcam 2")
     IRLCAM_NAMES = ("IRL4YOU Cam", "IRL4YOU Cam 2")
     TEST_NAMES = ("Testbild", "Testbild 2")
-    ALLOWED = ("enabled", "bitrate", "fps", "audio", "source", "usb_format")
+    ALLOWED = ("enabled", "bitrate", "fps", "audio", "source", "usb_format", "audio_offset_ms")
     TTL = 1.5
     DOWN = "Der HDMI-Dienst läuft nicht (Software-Update oder install.sh ausführen)"
 
