@@ -40,6 +40,26 @@ def say(text):
     sys.stderr.flush()
 
 
+PHONE_EVERY_S = 3.0                    # so oft reicht die Handyzeile für den Dienst (sie dient der Anzeige, nicht der Regelung)
+
+
+def phone_values(d):
+    """Prüft die Handydaten der App: bat 0..100, chg 0/1, cur in mA (Betrag unter 10000), temp in °C (-20..90), thermal 0..6; Unplausibles wird weggelassen"""
+    def num(k, lo, hi, digits=None):
+        v = d.get(k)
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or not lo <= v <= hi:
+            return None
+        return round(v, digits) if digits is not None else int(round(v))
+    out = {}
+    for k, v in (("bat", num("bat", 0, 100)), ("cur", num("cur", -9999, 9999)), ("temp", num("temp", -20, 90, 1)), ("thermal", num("thermal", 0, 6))):
+        if v is not None:
+            out[k] = v
+    chg = d.get("chg")
+    if chg in (0, 1, True, False):
+        out["chg"] = 1 if chg else 0
+    return out
+
+
 # ---------------------------------------------------------------- USB (usbfs)
 class _Ctrl(ctypes.Structure):
     _fields_ = [("rt", ctypes.c_uint8), ("req", ctypes.c_uint8), ("val", ctypes.c_uint16), ("idx", ctypes.c_uint16),
@@ -278,6 +298,7 @@ class Session:
         self.t_cfg = 0.0                 # Zeit der letzten CONFIG
         self.last_v_sent = 0.0           # Zeit des letzten Bilds, das an die Box ging
         self.stall_asked = 0.0
+        self.phone_at, self.phone_chg = -1e9, None
 
     def ts(self, pts, kind):
         if self.base is None:
@@ -389,6 +410,17 @@ class Session:
         except (UsbError, OSError):
             pass
 
+    def phone_line(self, d):
+        """Handydaten aus dem STATS-Rahmen (Akku, Laden, Strom, Temperatur) als eigene Zeile für den Dienst; ältere Apps schicken sie nicht"""
+        out = phone_values(d)
+        if not out:
+            return
+        now = self.clock()
+        if out.get("chg") == self.phone_chg and now - self.phone_at < PHONE_EVERY_S:
+            return
+        self.phone_at, self.phone_chg = now, out.get("chg")
+        say("Handy: " + json.dumps(out, separators=(",", ":")))
+
     def handle(self, kind, p):
         if kind in (MSG_AUDIO, MSG_STATS, MSG_VIDEO):
             self.check_stall()
@@ -426,6 +458,7 @@ class Session:
             say("info: App: Kamera %s/s, gesendet %s/s, verworfen %s, Rückstau %s, %s Mbit/s von %s, AE %s" % (
                 d.get("cam", "?"), d.get("out", "?"), d.get("dropped", "?"), d.get("backlog", "?"),
                 d.get("mbit", "?"), d.get("target", "?"), d.get("ae", "?")))
+            self.phone_line(d)
         elif kind == MSG_VIDEO_CSD and self.cfg:
             try:
                 self.record = hvcc_record(p) if self.cfg["codec"] == "hevc" else avcc_record(p)
