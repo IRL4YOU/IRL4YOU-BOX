@@ -158,6 +158,8 @@ def effective_cfg(cfg, use):
         audio_key = cfg.get(cfg["audio"]) if cfg.get("audio") in ("pip", "pip2", "pip3") else cfg.get("main")
         names = ("pip", "pip2", "pip3")
         out["audio"] = next((names[i] for i, k in enumerate(smalls) if k == audio_key), "main")
+    if cfg.get("audio") == "mic":
+        out["audio"] = "mic"                       # Ton vom USB-Mikrofon bleibt, egal welche Kameras gerade da sind
     return out, tuple(ks[:4])
 
 

@@ -5,6 +5,8 @@ Reines Python ohne Zusatzpakete (USB über /dev/bus/usb, usbfs). Eigenes Protoko
 kein Fremdcode. Rahmen: Typ (1 Byte), Länge (4 Byte, Big Endian), Inhalt.
   --dry          nur lesen und Kennzahlen zeigen, nichts an SRS senden
   --audio none   den Ton des Handys verwerfen
+  --audio usb    statt des Handy-Tons das erste USB-Mikrofon (zum Beispiel DJI-Empfänger) aufnehmen, AAC kodieren und mit dem Bild senden;
+                 --audio-offset MS verschiebt den Ton gegenüber dem Bild (positiv = später)
   --key/--rtmp-port/--rtmp-app wie mobcam_rtmp.py (nutzt dessen RTMP-Sender)
 Braucht Root (oder Rechte auf /dev/bus/usb)."""
 import argparse
@@ -17,6 +19,7 @@ import os
 import re
 import signal
 import struct
+import subprocess
 import sys
 import threading
 import time
@@ -59,6 +62,120 @@ def phone_values(d):
         if v in (0, 1, True, False):
             out[k] = 1 if v else 0
     return out
+
+
+# ---------------------------------------------------------------- USB-Mikrofon als Ton
+AAC_RATES = (96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000)
+MIC_RESYNC_MS = 120                    # so weit darf der Zeitstempel eines Tonrahmens von der Uhr des Bilds abweichen, bevor er neu angesetzt wird
+ALSA_CLOCK = ["provide-clock=false", "slave-method=resample"]
+
+
+def usb_capture_card(asound="/proc/asound"):
+    """Erste USB-Tonkarte mit Aufnahme (Mikrofon-Empfänger, Mischpult), als ALSA-Name plughw:CARD=<id>; None, wenn keine steckt."""
+    try:
+        cards = sorted(os.listdir(asound), key=lambda c: (len(c), c))
+    except OSError:
+        return None
+    for c in cards:
+        base = os.path.join(asound, c)
+        if not re.match(r"^card\d{1,2}$", c) or not os.path.exists(os.path.join(base, "usbbus")):
+            continue
+        try:
+            has_capture = any(re.match(r"^pcm\d+c$", d) for d in os.listdir(base))
+            with open(os.path.join(base, "id")) as f:
+                cid = f.read(40).strip()
+        except OSError:
+            continue
+        if has_capture and re.match(r"^[A-Za-z0-9_]{1,40}$", cid):
+            return "plughw:CARD=" + cid
+    return None
+
+
+def usb_audio_argv(device):
+    """GStreamer: Mikrofon aufnehmen, als AAC-LC mit ADTS-Kopf auf die Standardausgabe schreiben (48 kHz, Stereo, 128 kbit/s)."""
+    if not re.match(r"^plughw:CARD=[A-Za-z0-9_]{1,40}$", device):
+        raise ValueError("Tonkarte ungültig")
+    return (["gst-launch-1.0", "-q", "alsasrc", "device=" + device] + ALSA_CLOCK +
+            ["!", "audioconvert", "!", "audioresample", "!", "audio/x-raw,rate=48000,channels=2", "!", "voaacenc", "bitrate=128000", "!",
+             "aacparse", "!", "audio/mpeg,mpegversion=4,stream-format=adts", "!", "fdsink", "fd=1"])
+
+
+def adts_split(buf):
+    """Zerlegt einen ADTS-Datenstrom in (AAC-Rahmen ohne Kopf, AudioSpecificConfig, Abtastrate); Rest ist der angefangene letzte Rahmen."""
+    frames, i = [], 0
+    while True:
+        j = buf.find(b"\xff", i)
+        if j < 0:
+            return frames, b""
+        if len(buf) - j < 7:
+            return frames, buf[j:]
+        b = buf[j:j + 7]
+        if (b[1] & 0xF0) != 0xF0 or (b[1] & 0x06) != 0:
+            i = j + 1
+            continue
+        length = ((b[3] & 3) << 11) | (b[4] << 3) | (b[5] >> 5)
+        sri = (b[2] >> 2) & 0xF
+        if length < 7 or sri >= len(AAC_RATES):
+            i = j + 1
+            continue
+        if len(buf) - j < length:
+            return frames, buf[j:]
+        head = 7 if b[1] & 1 else 9
+        profile, ch = (b[2] >> 6) & 3, ((b[2] & 1) << 2) | (b[3] >> 6)
+        asc = bytes([((profile + 1) << 3) | (sri >> 1), ((sri & 1) << 7) | (ch << 3)])
+        frames.append((buf[j + head:j + length], asc, AAC_RATES[sri]))
+        i = j + length
+
+
+class UsbMic(threading.Thread):
+    """Nimmt das USB-Mikrofon auf und gibt jeden AAC-Rahmen mit seiner Ankunftszeit an die Sitzung. Fehlt die Tonkarte oder bricht die
+    Aufnahme ab (Empfänger abgezogen), wird alle paar Sekunden neu versucht; das Bild läuft unabhängig davon weiter."""
+
+    def __init__(self, session, asound="/proc/asound", spawn=subprocess.Popen, sleep=time.sleep):
+        super().__init__(daemon=True)
+        self.s, self.asound, self.spawn, self.sleep = session, asound, spawn, sleep
+        self.said = None
+
+    def note(self, text):
+        if text != self.said:
+            self.said = text
+            say(text)
+
+    def run(self):
+        while not self.s.closed:
+            dev = usb_capture_card(self.asound)
+            if dev is None:
+                self.note("info: Kein USB-Mikrofon gefunden (Empfänger anstecken), der Ton fehlt solange")
+                self.sleep(2)
+                continue
+            try:
+                proc = self.spawn(usb_audio_argv(dev), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            except (OSError, ValueError) as e:
+                self.note("info: Aufnahme des USB-Mikrofons startet nicht: %s" % e)
+                self.sleep(3)
+                continue
+            self.note("info: Ton vom USB-Mikrofon (%s)" % dev)
+            buf = b""
+            try:
+                while not self.s.closed:
+                    chunk = proc.stdout.read1(4096) if hasattr(proc.stdout, "read1") else proc.stdout.read(4096)
+                    if not chunk:
+                        break
+                    t = self.s.clock()
+                    frames, buf = adts_split(buf + chunk)
+                    for n, (raw, asc, rate) in enumerate(frames):
+                        self.s.on_mic_frame(raw, asc, rate, t - (len(frames) - 1 - n) * 1024.0 / rate)
+            except (OSError, ValueError):
+                pass
+            finally:
+                try:
+                    proc.kill()
+                    proc.wait(timeout=2)
+                except Exception:
+                    pass
+            if not self.s.closed:
+                self.note("info: Ton vom USB-Mikrofon unterbrochen, neuer Versuch")
+                self.sleep(3)
 
 
 # ---------------------------------------------------------------- USB (usbfs)
@@ -300,6 +417,8 @@ class Session:
         self.last_v_sent = 0.0           # Zeit des letzten Bilds, das an die Box ging
         self.stall_asked = 0.0
         self.phone_at, self.phone_chg = -1e9, None
+        self.tx_lock = threading.Lock()  # Bild (Hauptschleife) und Mikrofon-Ton (eigener Thread) schreiben in dieselbe RTMP-Verbindung
+        self.a_next = None               # Zeitstempel des nächsten Tonrahmens vom USB-Mikrofon (ms, Zeitachse des Bilds)
 
     def ts(self, pts, kind):
         if self.base is None:
@@ -311,20 +430,46 @@ class Session:
         self.last[kind] = t
         return t
 
+    def tx(self, name, *a):
+        """Sendet über die aktuelle RTMP-Verbindung; nie gleichzeitig aus zwei Threads."""
+        with self.tx_lock:
+            r = self.rtmp
+            if r is not None:
+                getattr(r, name)(*a)
+
+    def has_audio(self):
+        return self.args.audio == "usb" or self.cfg["audio"]["ch"] > 0
+
+    def on_mic_frame(self, raw, asc, rate, t):
+        """Ein AAC-Rahmen vom USB-Mikrofon (Aufnahmezeit t auf der Uhr dieser Sitzung). Der Zeitstempel folgt der Zeitachse des Bilds: Zeit des letzten
+        Bilds plus Zeit seitdem plus der eingestellte Ton-Versatz; die Rahmen laufen sonst lückenlos (1024 Abtastwerte je Rahmen)."""
+        if self.args.dry or self.rtmp is None or not self.last_v_sent or self.hold_until:
+            return
+        ref = self.last["v"] + (t - self.last_v_sent) * 1000.0 + getattr(self.args, "audio_offset", 0)
+        if self.a_next is None or abs(self.a_next - ref) > MIC_RESYNC_MS:
+            self.a_next = ref
+        ts = max(int(self.a_next), self.last["a"], 0)
+        self.a_next += 1024.0 * 1000.0 / rate
+        self.last["a"] = ts
+        if not self.audio_sent:
+            self.audio_sent = True
+            self.tx("send_audio", ts, self.m.flv_audio(0, asc))
+        self.tx("send_audio", ts, self.m.flv_audio(1, raw))
+
     def open_rtmp(self):
         import mobcam_rtmp as m
         self.m = m
         self.rtmp = m.Rtmp("127.0.0.1", self.args.rtmp_port, self.args.rtmp_app, self.args.key)
         codec = m.CODEC_HEVC if self.cfg["codec"] == "hevc" else m.CODEC_H264
         self.codec = codec
-        self.rtmp.send_data(0, m.metadata(self.cfg["w"], self.cfg["h"], codec, self.cfg["audio"]["ch"] > 0))
-        self.rtmp.send_video(0, m.flv_video(codec, True, 0, self.record))
+        self.tx("send_data", 0, m.metadata(self.cfg["w"], self.cfg["h"], codec, self.has_audio()))
+        self.tx("send_video", 0, m.flv_video(codec, True, 0, self.record))
 
     def reconf_header(self, t):
         """Neue Bildgröße im selben RTMP-Strom: Metadaten und neuer Kopf (Parametersätze) kurz vor dem ersten Schlüsselbild der neuen Größe."""
         self.reconf = False
-        self.rtmp.send_data(t, self.m.metadata(self.cfg["w"], self.cfg["h"], self.codec, self.cfg["audio"]["ch"] > 0))
-        self.rtmp.send_video(t, self.m.flv_video(self.codec, True, 0, self.record))
+        self.tx("send_data", t, self.m.metadata(self.cfg["w"], self.cfg["h"], self.codec, self.has_audio()))
+        self.tx("send_video", t, self.m.flv_video(self.codec, True, 0, self.record))
 
     def restart_stream(self, hold=False):
         """Neuer RTMP-Strom (Größe oder Codec haben gewechselt): alte Verbindung schließen, Zeit und Parametersätze zurücksetzen.
@@ -344,6 +489,7 @@ class Session:
         self.audio_sent = False
         self.base = None
         self.last = {"v": 0, "a": 0}
+        self.a_next = None
         self.vshift = 0
         self.v_arr0 = None
         self.v_ref = 0.0
@@ -494,17 +640,17 @@ class Session:
                 t = self.ts(pts, "v")
                 if self.reconf:
                     self.reconf_header(t)
-                self.rtmp.send_video(t, self.m.flv_video(self.codec, key, 1, to_length_prefixed(p[9:])))
+                self.tx("send_video", t, self.m.flv_video(self.codec, key, 1, to_length_prefixed(p[9:])))
                 self.last_v_sent = self.clock()
             self.report(len(p), vpts=pts)
         elif kind == MSG_AUDIO and len(p) > 8:
             pts = struct.unpack(">Q", p[:8])[0]
             self.st["a"] += 1
-            if not self.args.dry and self.rtmp is not None and self.acsd and self.args.audio != "none":
+            if not self.args.dry and self.rtmp is not None and self.acsd and self.args.audio == "mobcam":
                 if not self.audio_sent:
-                    self.rtmp.send_audio(self.last["a"], self.m.flv_audio(0, self.acsd))
+                    self.tx("send_audio", self.last["a"], self.m.flv_audio(0, self.acsd))
                     self.audio_sent = True
-                self.rtmp.send_audio(self.ts(pts, "a"), self.m.flv_audio(1, p[8:]))
+                self.tx("send_audio", self.ts(pts, "a"), self.m.flv_audio(1, p[8:]))
             self.report(len(p), apts=pts)
 
     def close(self):
@@ -529,7 +675,8 @@ def _wait_note(s):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry", action="store_true")
-    ap.add_argument("--audio", default="mobcam", choices=("mobcam", "none"))
+    ap.add_argument("--audio", default="mobcam", choices=("mobcam", "none", "usb"))
+    ap.add_argument("--audio-offset", type=int, default=0, help="nur mit --audio usb: Ton gegenüber dem Bild verschieben, in ms (positiv = später)")
     ap.add_argument("--reconfig", default="restart", choices=("inband", "restart"),
                     help="Bildgröße wechselt: restart (Standard) = Strom schließen, ca. 3,5 s warten und neu öffnen; inband = neuer Kopf im selben Strom "
                          "(stürzt die Live-Kette ab, wenn zwischen den Bildern mehr als ca. 80 ms liegen)")
@@ -538,6 +685,7 @@ def main():
     ap.add_argument("--rtmp-app", default="publish")
     ap.add_argument("--seconds", type=float, default=0, help="nach so vielen Sekunden beenden (Test)")
     args = ap.parse_args()
+    args.audio_offset = max(-1000, min(1000, args.audio_offset))
     if not re.match(r"^[a-z0-9][a-z0-9_-]{0,31}$", args.key) or not re.match(r"^[a-z0-9_]{1,20}$", args.rtmp_app):
         say("Ungültige Einstellung")
         sys.exit(2)
@@ -560,6 +708,8 @@ def main():
         say("Handy verbunden (USB-Zubehör)")
         s = Session(acc, args)
         threading.Thread(target=_wait_note, args=(s,), daemon=True).start()
+        if args.audio == "usb" and not args.dry:
+            UsbMic(s).start()
         try:
             s.run()
         except (UsbError, OSError, ValueError, KeyError, struct.error, json.JSONDecodeError) as e:

@@ -27,6 +27,36 @@ STATS_MAX_AGE_S = 4.0
 Z_BIG = 1
 COLOR_CAPS = "video/x-raw,format=NV12,colorimetry=bt709"
 AUDIO_CAPS = "audio/x-raw,format=S16LE,rate=48000,channels=2"
+MIC_BUILT = False        # die zuletzt gebaute Kette enthält den Eingang des USB-Mikrofons (Ton von „Mikrofon-Empfänger“)
+MIC_OFFSET_MAX = 1500    # Ton-Versatz des Mikrofons in ms (Ton wartet; so viel darf er dem Bild nachhinken)
+
+
+def mic_device(asound="/proc/asound"):
+    """Erste USB-Tonkarte mit Aufnahme (zum Beispiel DJI-Mikrofon-Empfänger) als plughw:CARD=<id>; None, wenn keine steckt."""
+    try:
+        cards = sorted(os.listdir(asound), key=lambda c: (len(c), c))
+    except OSError:
+        return None
+    for c in cards:
+        base = os.path.join(asound, c)
+        if not re.match(r"^card\d{1,2}$", c) or not os.path.exists(os.path.join(base, "usbbus")):
+            continue
+        try:
+            has_capture = any(re.match(r"^pcm\d+c$", d) for d in os.listdir(base))
+            with open(os.path.join(base, "id")) as f:
+                cid = f.read(40).strip()
+        except OSError:
+            continue
+        if has_capture and re.match(r"^[A-Za-z0-9_]{1,40}$", cid):
+            return "plughw:CARD=" + cid
+    return None
+
+
+def mic_offset_ms(c):
+    try:
+        return max(0, min(MIC_OFFSET_MAX, int(c.get("mic_offset_ms", 0) or 0)))
+    except (TypeError, ValueError):
+        return 0
 
 
 _SUP = {"mtime": None, "ok": False}
@@ -316,6 +346,13 @@ def build(c, base=RTMP_BASE, frame=None):
             + venc_chain(q) + ".",
             f"input-selector name=audiosel ! volume name=avol ! opusenc bitrate=128000 ! opusparse ! {q} ! mux.",
             f"audiotestsrc is-live=true wave=silence ! capsfilter caps=\"{AUDIO_CAPS}\" ! queue ! audiosel.sink_0"]
+    global MIC_BUILT
+    dev = mic_device() if c.get("audio") == "mic" else None
+    MIC_BUILT = bool(dev)
+    if dev:                                      # Ton vom USB-Mikrofon: eigener Eingang des Tonwählers, Verzögerung (Ton-Versatz) als queue-Schwelle, im Betrieb änderbar
+        off = mic_offset_ms(c)
+        main.append(f"alsasrc name=mic device={dev} provide-clock=false slave-method=resample ! audioconvert ! audioresample ! capsfilter caps=\"{AUDIO_CAPS}\" ! "
+                    f"queue name=micq max-size-time={(off + 2000) * 1000000} max-size-buffers=0 max-size-bytes=0 min-threshold-time={off * 1000000} ! audiosel.sink_{SLOTS + 1}")
     n = SLOTS
     for k in range(RINGS):
         for j in range(4):
@@ -488,7 +525,11 @@ class Layout:
             src = by_pos.get(0)
         if src is not None and src in audio_ok:
             asel = src + 1
+        if MIC_BUILT and c.get("audio") == "mic":
+            asel = SLOTS + 1                       # Ton vom Mikrofon statt von einer Kamera
         add(("asel",), f"select audiosel sink_{asel}", 100)
+        if MIC_BUILT:
+            add(("micd",), f"set micq min-threshold-time {mic_offset_ms(c) * 1000000}", 100)
         add(("mute",), f"set avol mute {'true' if mute else 'false'}", 100)
         for s in range(SLOTS):
             d = delay_ms.get(slot_key[s] or "", 0)

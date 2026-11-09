@@ -23,7 +23,8 @@ HDMI_DEVICE = "/dev/hdmirx"
 HDMI_STATUS = "/sys/kernel/debug/hdmirx/status"
 HDMI_AUDIO = "hw:CARD=rockchiphdmiin"
 KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
-DEFAULTS = {"enabled": False, "key": "hdmi", "bitrate": 8000, "fps": 30, "audio": "hdmi", "source": "hdmi", "usb_format": "auto"}
+DEFAULTS = {"enabled": False, "key": "hdmi", "bitrate": 8000, "fps": 30, "audio": "hdmi", "source": "hdmi", "usb_format": "auto", "audio_offset_ms": 0}
+AUDIO_OFFSET_RANGE = (-1000, 1000)      # Ton gegenüber dem Bild verschieben (ms, positiv = Ton später); gilt, wenn der Ton von einer USB-Tonkarte oder dem Analogeingang kommt
 SOURCE_CHOICES = ("hdmi", "usb", "mobcam", "irlcam", "test")
 PHONE_SOURCES = ("mobcam", "irlcam")      # Quellen, bei denen ein Handy per USB Bild und Ton liefert (iPhone mit Moblin / Android mit der App IRL4YOU Cam)
 TEST_SIZE = (1280, 720)
@@ -132,6 +133,11 @@ def clean_settings(d, current=None):
         if d["audio"] not in AUDIO_CHOICES:
             raise ValueError("Ton: HDMI-Ton, USB-Tonkarte, Analogeingang, iPhone-Mikrofon oder ohne Ton")
         out["audio"] = d["audio"]
+    if "audio_offset_ms" in d:
+        o = d["audio_offset_ms"]
+        if isinstance(o, bool) or not isinstance(o, int) or not AUDIO_OFFSET_RANGE[0] <= o <= AUDIO_OFFSET_RANGE[1]:
+            raise ValueError("Ton-Versatz: %d bis %d ms" % AUDIO_OFFSET_RANGE)
+        out["audio_offset_ms"] = o
     if "source" in d:
         if d["source"] not in SOURCE_CHOICES:
             raise ValueError("Quelle: HDMI-Eingang, USB-Webcam, iPhone (Mobcam) oder Testbild")
@@ -144,6 +150,25 @@ def clean_settings(d, current=None):
 
 
 ALSA_CLOCK = ["provide-clock=false", "slave-method=resample"]
+
+
+def delay_chain(chain, ms):
+    """Hängt an das Ende einer Gst-Kette (…, "queue", "!", "mux.") eine Verzögerung von ms Millisekunden: die letzte queue hält so lange Daten zurück."""
+    if ms <= 0:
+        return chain
+    chain = list(chain)
+    for i in range(len(chain) - 3, -1, -1):
+        if chain[i] == "queue" and chain[i + 1] == "!" and chain[i + 2] == "mux.":
+            chain[i:i + 1] = ["queue", "max-size-time=%d" % ((ms + 1000) * 1000000), "max-size-buffers=0", "max-size-bytes=0",
+                              "min-threshold-time=%d" % (ms * 1000000)]
+            return chain
+    return chain
+
+
+def apply_audio_offset(v, a, cfg, extern):
+    """Ton vom USB-Mikrofon oder Analogeingang gegenüber dem Bild verschieben: positiv = Ton später (Ton wird gehalten), negativ = Bild später."""
+    off = cfg.get("audio_offset_ms", 0) if extern else 0
+    return delay_chain(v, -off if off < 0 else 0), delay_chain(a, off if off > 0 else 0)
 
 
 def feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, device=HDMI_DEVICE, audio_device=HDMI_AUDIO, extra_audio=None):
@@ -167,6 +192,7 @@ def feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, device=HDMI_DEVICE,
     else:
         a = ["audiotestsrc", "wave=silence", "is-live=true", "!", "audio/x-raw,rate=48000,channels=2", "!",
              "voaacenc", "bitrate=128000", "!", "aacparse", "!", "queue", "!", "mux."]
+    v, a = apply_audio_offset(v, a, cfg, cfg["audio"] in ("usb", "analog") and bool(extra_audio))
     sink = ["flvmux", "name=mux", "streamable=true", "!", "rtmpsink", "location=rtmp://127.0.0.1:%d/%s/%s" % (rtmp_port, rtmp_app, cfg["key"])]
     return ["gst-launch-1.0", "-q"] + v + a + sink
 
@@ -378,7 +404,11 @@ def mobcam_feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, helper=MOBCA
 
 def irlcam_feeder_argv(cfg, rtmp_port=RTMP_PORT, rtmp_app=RTMP_APP, helper=IRLCAM_HELPER):
     """Android-Handy mit der App IRL4YOU Cam: Bild und Ton kommen per USB-Zubehör-Protokoll, das Hilfsprogramm reicht sie unverändert an SRS."""
-    return mobcam_feeder_argv(cfg, rtmp_port, rtmp_app, helper=helper)
+    cfg = clean_settings(cfg)
+    argv = mobcam_feeder_argv(cfg, rtmp_port, rtmp_app, helper=helper)
+    if cfg["audio"] == "usb":                       # Ton vom USB-Mikrofon (Empfänger) statt vom Handy; das Hilfsprogramm sucht die Tonkarte selbst
+        argv[-1:] = ["usb", "--audio-offset", str(cfg["audio_offset_ms"])]
+    return argv
 
 
 def usb_candidates(fmt):
@@ -440,6 +470,7 @@ def usb_feeder_argv(cfg, device, cand, audio_device=None, rtmp_port=RTMP_PORT, r
     else:
         a = ["audiotestsrc", "wave=silence", "is-live=true", "!", "audio/x-raw,rate=48000,channels=2", "!",
              "voaacenc", "bitrate=128000", "!", "aacparse", "!", "queue", "!", "mux."]
+    v, a = apply_audio_offset(v, a, cfg, cfg["audio"] in ("usb", "analog") and bool(audio_device))
     sink = ["flvmux", "name=mux", "streamable=true", "!", "rtmpsink", "location=rtmp://127.0.0.1:%d/%s/%s" % (rtmp_port, rtmp_app, cfg["key"])]
     return ["gst-launch-1.0", "-q"] + v + a + sink
 
@@ -642,7 +673,7 @@ class Daemon:
             if phone:
                 sig.update(plugged=True, locked=True, device="mobcam")
             self.usb = dict(self.usb, power=False, present=bool(phone), name=phone["name"] if phone else "", node="",
-                            format=self.mobcam_fmt if phone and self.proc is not None else "", audio="mobcam")
+                            format=self.mobcam_fmt if phone and self.proc is not None else "", audio=self._phone_audio())
             return sig
         if self.cfg.get("source") == "irlcam":
             self.signal_known = True
@@ -658,7 +689,7 @@ class Daemon:
             if phone:
                 sig.update(plugged=True, locked=True, device="irlcam")
             self.usb = dict(self.usb, power=False, present=bool(phone), name=phone["name"] if phone else "", node="",
-                            format=self.mobcam_fmt if phone and self.proc is not None else "", audio="mobcam")
+                            format=self.mobcam_fmt if phone and self.proc is not None else "", audio=self._phone_audio())
             return sig
         loop = asyncio.get_event_loop()
         try:
@@ -673,6 +704,12 @@ class Daemon:
         return await asyncio.create_subprocess_exec(
             *argv, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
             preexec_fn=lambda: os.nice(NICE))
+
+    def _phone_audio(self):
+        """Ton der Handy-Quellen für die Anzeige: 'mobcam' = Mikrofon des Handys; bei USB-Mikrofon die Tonkarte (leer = keine gefunden)."""
+        if self.cfg.get("source") == "irlcam" and self.cfg.get("audio") == "usb":
+            return find_extra_audio("usb", self.asound) or ""
+        return "mobcam"
 
     def _phone_seen(self, raw):
         try:
@@ -914,7 +951,7 @@ class Daemon:
         if cmd == "set":
             new = clean_settings(req.get("settings"), self.cfg)
             if new.get("source") != self.cfg.get("source"):
-                if new["source"] in PHONE_SOURCES and new["audio"] == "hdmi":
+                if new["source"] in PHONE_SOURCES and (new["audio"] == "hdmi" or new["audio"] in ("usb", "analog") and not (new["source"] == "irlcam" and new["audio"] == "usb")):
                     new["audio"] = "mobcam"
                 elif new["source"] not in PHONE_SOURCES and new["audio"] == "mobcam":
                     new["audio"] = "hdmi"
