@@ -183,6 +183,67 @@ class TestIrlcamDienst(unittest.TestCase):
         self.assertIsNotNone(self.hd.MOBCAM_FORMAT_RE.match("Bild: 1920x1080 HEVC"))                  # Zeile des iPhone-Hilfsprogramms
         self.assertIsNone(self.hd.MOBCAM_FORMAT_RE.match("Bild: 1280x720 VP9"))
 
+    def test_handydaten_nur_mit_angestecktem_handy_und_frischen_werten(self):
+        d = self._daemon(tempfile.mkdtemp(), [], proc=True)
+        d.usb = dict(d.usb, present=True)
+        self.assertIsNone(d.phone_now())
+        self.assertNotIn("phone", d.status())                                       # ältere App: keine Kachel
+        d._phone_seen(json.dumps({"bat": 97, "chg": 1, "cur": 312, "temp": 31.5}))
+        self.assertEqual(d.phone_now(), {"bat": 97, "chg": 1, "cur": 312, "temp": 31.5})
+        self.assertEqual(d.status()["phone"]["bat"], 97)
+        self.t += self.hd.PHONE_FRESH_S + 1                                          # App meldet sich nicht mehr: Kachel weg
+        self.assertIsNone(d.phone_now())
+        d._phone_seen(json.dumps({"bat": 96, "chg": 0}))
+        self.assertEqual(d.phone_now(), {"bat": 96, "chg": 0})
+        d.usb = dict(d.usb, present=False)                                           # Kabel abgezogen: Kachel weg
+        self.assertIsNone(d.phone_now())
+        d.usb = dict(d.usb, present=True)
+        d.cfg = dict(d.cfg, source="mobcam")                                         # andere Quelle: keine Handydaten
+        self.assertIsNone(d.phone_now())
+        d.cfg = dict(d.cfg, source="irlcam")
+        d._phone_seen("kaputt")                                                      # kein JSON, leer, falscher Typ: ignorieren
+        d._phone_seen("{}")
+        d._phone_seen("[1]")
+        self.assertEqual(d.phone_now(), {"bat": 96, "chg": 0})
+        d.proc = None                                                                # Einspeisung beendet: Kachel weg
+        self.assertIsNone(d.phone_now())
+
+    def test_akkuverlauf_ein_punkt_je_minute_und_neu_nach_langer_pause(self):
+        d = self._daemon(tempfile.mkdtemp(), [], proc=True)
+        d.usb = dict(d.usb, present=True)
+        for i in range(5):                                                           # 5 Meldungen im Sekundentakt: nur ein Punkt
+            d._phone_seen(json.dumps({"bat": 97, "chg": 1}))
+            self.t += 1
+        self.assertEqual(len(d.phone_hist), 1)
+        self.assertNotIn("hist", d.phone_now())                                      # ein Punkt ist noch keine Kurve
+        self.t += 60
+        d._phone_seen(json.dumps({"bat": 96, "chg": 1}))
+        self.t += 10
+        d._phone_seen(json.dumps({"bat": 96, "chg": 1}))                             # (kein neuer Punkt, hält die Werte frisch)
+        h = d.phone_now()["hist"]
+        self.assertEqual([b for _, b in h], [97, 96])
+        self.assertEqual([a for a, _ in h], [75, 10])                                # Sekunden seit dem Punkt
+        for i in range(self.hd.PHONE_HIST_MAX + 20):                                 # höchstens 6 Stunden
+            self.t += 61
+            d._phone_seen(json.dumps({"bat": 90, "chg": 0}))
+        self.assertEqual(len(d.phone_hist), self.hd.PHONE_HIST_MAX)
+        self.t += self.hd.PHONE_HIST_GAP_S + 1                                       # lange nichts gehört: neuer Verlauf
+        d._phone_seen(json.dumps({"bat": 50, "chg": 0}))
+        self.assertEqual([b for _, b in d.phone_hist], [50])
+
+    def test_handystand_im_journal_alle_fuenf_minuten_und_beim_wechsel(self):
+        d = self._daemon(tempfile.mkdtemp(), [], proc=True)
+        with self.assertLogs("pipbox-hdmi", level="INFO") as cm:
+            d._phone_seen(json.dumps({"bat": 97, "chg": 1, "cur": 312, "temp": 31.5}))
+            self.t += 60
+            d._phone_seen(json.dumps({"bat": 97, "chg": 1}))                          # zu früh, kein Wechsel: nichts
+            d._phone_seen(json.dumps({"bat": 96, "chg": 0}))                          # Laden aus: sofort
+            self.t += self.hd.PHONE_LOG_S
+            d._phone_seen(json.dumps({"bat": 95, "chg": 0}))
+        msgs = [r.getMessage() for r in cm.records]
+        self.assertEqual(msgs, ["IRL4YOU Cam: Handy Akku 97 %, lädt, 312 mA, 31.5 °C", "IRL4YOU Cam: Handy Akku 96 %, lädt nicht",
+                                "IRL4YOU Cam: Handy Akku 95 %, lädt nicht"])
+
 
 class FakeRtmp:
     def __init__(self, *a):
@@ -516,6 +577,33 @@ class TestIrlcamHilfsprogramm(unittest.TestCase):
         self.assertTrue(zeilen[0].startswith("Bild: 1920x1080 HEVC 30 fps"))
         self.assertIsNotNone(irl("hdmi_daemon").MOBCAM_FORMAT_RE.match(zeilen[0]))
 
+    def test_handydaten_werden_geprueft_und_nur_selten_gemeldet(self):
+        s, acc, fake = self._session()
+        t = [100.0]
+        s.clock = lambda: t[0]
+        zeilen = []
+        orig = ac.say
+        ac.say = zeilen.append
+        try:
+            stat = lambda **k: s.handle(ac.MSG_STATS, json.dumps(dict({"cam": 30}, **k)).encode())
+            stat()                                                                 # ältere App ohne Handydaten: keine Zeile
+            stat(bat=97, chg=1, cur=312, temp=31.46, thermal=0)
+            stat(bat=96, chg=1, cur=300, temp=31.5)                                 # gleich danach, Laden unverändert: keine neue Zeile
+            t[0] += 1
+            stat(bat=96, chg=0, cur=-150, temp=31.5)                                # Laden hat aufgehört: sofort melden
+            t[0] += 3.5
+            stat(bat=150, chg=1, cur=99999, temp="heiß", thermal=9)                 # Unsinn wird weggelassen, nur chg bleibt
+            t[0] += 3.5
+            stat(bat=True, temp=float("nan"))                                       # nichts Brauchbares: keine Zeile
+        finally:
+            ac.say = orig
+        z = [x for x in zeilen if x.startswith("Handy: ")]
+        self.assertEqual([json.loads(x[7:]) for x in z], [
+            {"bat": 97, "cur": 312, "temp": 31.5, "thermal": 0, "chg": 1},
+            {"bat": 96, "cur": -150, "temp": 31.5, "chg": 0},
+            {"chg": 1}])
+        self.assertTrue(irl("hdmi_daemon").PHONE_LINE_RE.match(z[0]))
+
 
 class TestIrlcamOberflaeche(unittest.TestCase):
     def test_auswahl_und_texte_stehen_da(self):
@@ -528,6 +616,36 @@ class TestIrlcamOberflaeche(unittest.TestCase):
         self.assertIn("Die App IRL4YOU Cam auf dem Android-Handy", js)
         self.assertIn("irlcam", lesen("web", "partials", "c_cams.html"))
         self.assertIn("Android-Handy nicht gefunden", lesen("web", "neu", "views", "live.js"))
+
+    def test_handykachel_auf_der_live_seite(self):
+        def lesen(*p):
+            with open(os.path.join(ROOT, "irl4you", *p), encoding="utf-8") as f:
+                return f.read()
+        js = lesen("web", "neu", "views", "live.js")
+        self.assertIn("phoneCard", js)
+        self.assertIn("poll('hdmi', '/api/hdmi'", js)
+        self.assertIn("data-phone-curve", js.replace("phoneCurve: ''", "data-phone-curve"))
+        self.assertNotIn("Neu.t(", js)                                              # Übersetzung läuft über den Text selbst, nicht über eine Funktion
+        for sprache in ("en", "ja", "ru"):
+            d = json.loads(lesen("web", "i18n", sprache + ".json"))["exact"]
+            for k in ("lädt nicht", "Akkuverlauf", "letzte {1}"):
+                self.assertIn(k, d, sprache)
+
+    def test_webdienst_reicht_handydaten_durch(self):
+        irl("hdmi_daemon")
+        from webui import camservices
+        svc = camservices.HdmiService(tempfile.mkdtemp(), None)
+        antwort = {"state": "streaming", "settings": {}, "usb": {"present": True},
+                   "phone": {"bat": 95, "chg": 1, "cur": -308, "temp": 36.6, "thermal": 0, "boese": 1, "x": "text", "y": True}}
+        svc._call = lambda req, timeout=4: antwort
+        self.assertEqual(svc.status()["phone"], {"bat": 95, "chg": 1, "cur": -308, "temp": 36.6, "thermal": 0})
+        svc._hit = (0.0, None)
+        antwort = {"state": "streaming", "settings": {}, "usb": {"present": True}}      # ohne Handydaten: kein Feld, keine Kachel
+        self.assertNotIn("phone", svc.status())
+        svc._hit = (0.0, None)
+        antwort = {"state": "streaming", "settings": {}, "usb": {"present": True},
+                   "phone": {"bat": 95, "hist": [[300, 96], [240, 96], "x", [1, 2, 3], ["a", 1], [0, 95]]}}
+        self.assertEqual(svc.status()["phone"]["hist"], [[300, 96], [240, 96], [0, 95]])   # nur Zahlenpaare kommen durch
 
     def test_standardname_der_kamera(self):
         irl("hdmi_daemon")
