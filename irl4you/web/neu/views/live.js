@@ -285,6 +285,55 @@
     const upSel = (m, sr) => { const sel = sr && sr.settings ? sr.settings.uplinks : null; const nets = Object.entries(m.net || {}), f = sel ? nets.filter(([n]) => sel.includes(n)) : []; return f.length ? f : nets; };
     const upTotal = (m, sr) => upSel(m, sr).reduce((a, [, v]) => a + (+v.tx_mbit || 0), 0);
     const upShown = (m, sr) => { const wire = upTotal(m, sr), pay = m.payload_mbit == null ? null : +m.payload_mbit; return pay == null || isNaN(pay) ? wire : Math.min(pay, wire); };
+    /* Kachel „Handy“ (IRL4YOU Cam): Akku, Laden, Strom und Temperatur, so wie die App sie über das USB-Kabel meldet. Ohne angestecktes Handy oder ohne Werte gibt es sie nicht. */
+    let phoneCv = null, phoneInfo = { tone: '', curTone: 'ok', hot: '', amount: '', temp: '', span: '' };
+    const phoneCard = stat => {
+      const p = (App.data.hdmi || {}).phone;
+      if (!p || p.bat == null) return [];
+      /* Netto-Strom am Akku (Android-Vorgabe: plus = lädt, minus = Akku sinkt). Der Status „lädt“ allein sagt nichts: Mit zu schwachem Netzteil sinkt der Akku trotzdem. */
+      const net = p.cur != null ? p.cur : null, up = net != null ? net > 0 : !!p.chg;
+      const hot = p.temp != null && p.temp >= 45 ? 'danger' : p.temp != null && p.temp >= 42 ? 'warn' : '';
+      const curTone = up ? 'ok' : p.bat <= 15 ? 'danger' : 'warn';                                      // grün = lädt, orange = Akku sinkt, rot = fast leer
+      const amount = net != null ? `${net > 0 ? '+' : '\u2212'}${Math.abs(net)} mA` : (p.chg ? 'lädt' : 'lädt nicht');   // ohne Stromwert nur das Wort
+      const hist = Array.isArray(p.hist) && p.hist.length > 1 ? p.hist : null, mins = hist ? Math.round(hist[0][0] / 60) : 0;
+      const spanTxt = !hist ? '' : mins < 60 ? `${Math.max(1, mins)} min` : `${Math.floor(mins / 60)} h ${mins % 60} min`;
+      phoneInfo = { tone: hot || curTone, curTone, hot, amount, temp: p.temp != null ? `${fmt(p.temp, 1)} °C` : '', span: spanTxt ? `letzte ${spanTxt}` : '' };
+      /* Aufbau wie bei Upload und genauso hoch: Titel und Temperatur in einer Zeile, Wert und Strom in einer Zeile, darunter die Kurve (ihr Platz ist immer reserviert, damit die Karte nicht springt) */
+      const card = stat('Handy', fmt(p.bat, 0), '%', null, null, h('div', { class: 'sig-slot', data: { phoneCurve: '' }, style: 'min-height:2.25rem' }));
+      card.querySelector('.card__body').style.gap = 'var(--space-1)';          // enger als bei den anderen Karten, damit sie nicht höher wird als die obere Reihe
+      const st = card.querySelector('.stat'), lab = st.querySelector('.stat__label'), val = st.querySelector('.stat__value');
+      val.style.cssText += ';flex:none;white-space:nowrap'; lab.style.whiteSpace = 'nowrap';
+      val.querySelector('.stat__unit').style.marginLeft = '0.0625rem'; st.style.gap = '0.125rem';          // Zahl und % dicht beieinander, Titel und Wert enger
+      const side = k => h('span', { class: 'muted', data: { [k]: '' }, style: 'font-size:var(--text-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;text-align:right' });
+      const row = (main, k) => h('div', { style: 'display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-2)' }, main, side(k));
+      st.replaceChildren(row(lab, 'phoneTemp'), row(val, 'phoneCur'));
+      return [card];
+    };
+    /* Kurve des Akkuverlaufs (die Box merkt sich 6 Stunden, ein Punkt je Minute), gleiches Aussehen wie die Kurve bei Upload; die Skala läuft vom niedrigsten bis zum höchsten Stand */
+    const phoneDraw = () => {
+      const cur = kpi.querySelector('[data-phone-cur]'), tmp = kpi.querySelector('[data-phone-temp]');
+      if (cur) { const sg = phoneInfo.curTone + '|' + phoneInfo.amount; if (cur.__sg !== sg) { cur.__sg = sg; cur.replaceChildren(h('strong', { style: `color:var(--${phoneInfo.curTone})`, text: phoneInfo.amount })); } }      // Strom in der Farbe des Ladens
+      if (tmp) { const sg = phoneInfo.hot + '|' + phoneInfo.temp; if (tmp.__sg !== sg) { tmp.__sg = sg; tmp.textContent = phoneInfo.temp; tmp.style.color = phoneInfo.hot ? `var(--${phoneInfo.hot})` : ''; } }
+      const slot = kpi.querySelector('[data-phone-curve]'), hist = ((App.data.hdmi || {}).phone || {}).hist;
+      if (!slot || !Array.isArray(hist) || hist.length < 2) return;
+      if (!phoneCv) {
+        const NS = 'http://www.w3.org/2000/svg', mk = n => document.createElementNS(NS, n);
+        const svg = mk('svg'); svg.setAttribute('viewBox', '0 0 60 28'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true');
+        const g = mk('path'); g.setAttribute('class', 'sg'); g.setAttribute('d', 'M0 1H60M0 14H60M0 27H60'); const pl = mk('polyline'); svg.append(g, pl);
+        const scale = [h('i'), h('i'), h('i')];
+        phoneCv = { scale, line: pl, el: h('span', { class: 'hsig', role: 'img', 'aria-label': 'Akkuverlauf' }, h('span', { class: 'hsig__scale', 'aria-hidden': 'true' }, scale), svg) };
+      }
+      if (!slot.contains(phoneCv.el)) slot.append(phoneCv.el);
+      phoneCv.el.style.marginTop = '0'; phoneCv.el.dataset.tone = phoneInfo.tone; if (phoneInfo.span && phoneCv.el.title !== phoneInfo.span) phoneCv.el.title = phoneInfo.span;
+      const span = Math.max(300, hist[0][0]), vals = hist.map(x => x[1]);
+      let hi = Math.max(...vals), lo = Math.min(...vals); if (hi - lo < 4) { const mid = (hi + lo) / 2; hi = Math.min(100, Math.ceil(mid + 2)); lo = Math.max(0, hi - 4); }
+      const pts = hist.map(([age, v]) => ((span - age) / span * 60).toFixed(1) + ',' + (27 - (v - lo) / (hi - lo) * 26).toFixed(1));
+      pts.push('60,' + pts[pts.length - 1].split(',')[1]);
+      phoneCv.line.setAttribute('points', pts.join(' '));
+      [hi, Math.round((hi + lo) / 2), lo].forEach((v, i) => { const t = String(v); if (phoneCv.scale[i].textContent !== t) phoneCv.scale[i].textContent = t; });
+    };
+    /* Kurve „Upload“ in die erste Karte setzen; auch nachträglich, falls sie beim ersten Zeichnen noch nicht bereit war (kopf.js lädt unter Umständen später) */
+    const upSig = () => { const slot = kpi.querySelector('.sig-slot'); if (slot && !slot.children.length && Neu.sigMeter) { liveSig = liveSig || Neu.sigMeter(); slot.append(liveSig); } };
     function renderKpi() {
       const s = App.data.send || {}, m = App.data.metrics || {}, sr = App.data.srtla;
       const send = (m.details || {}).send || {};
@@ -297,17 +346,19 @@
         stat('Prozessor', fmt(cpu, 0), '%', cpu, cpu > 90 ? 'danger' : cpu > 75 ? 'warn' : undefined, m.cpu && m.cpu.max != null ? h('span', { class: 'muted', style: 'font-size:var(--text-xs)', text: `höchster Kern ${fmt(m.cpu.max, 0)} %` }) : null),
         stat('Temperatur', fmt(temp, 0), '°C', temp != null ? temp / 100 * 100 : null, temp > 80 ? 'danger' : temp > 70 ? 'warn' : 'ok'),
         stat('Arbeitsspeicher', fmt(mem.used_pct, 0), '% belegt', mem.used_pct, mem.used_pct > 90 ? 'danger' : mem.used_pct > 80 ? 'warn' : undefined, h('span', { class: 'muted', style: 'font-size:var(--text-xs)', text: `${fmt((mem.avail_mb || 0) / 1024)} GiB frei` })),
-        ...(s.active && send.rtt_ms != null ? [stat('Antwortzeit', fmt(send.rtt_ms, 0), 'ms', null)] : [])];
+        ...(s.active && send.rtt_ms != null ? [stat('Antwortzeit', fmt(send.rtt_ms, 0), 'ms', null)] : []),
+        ...phoneCard(stat)];
       /* Aufbau nur ändern, wenn sich Beschriftung, Einheit oder Farbe ändern; sonst die Zahlen, Balken und die Kurve an Ort und Stelle nachtragen (kein Flackern) */
-      const shape = cards.map(c => [c.querySelector('.stat__label').textContent, c.querySelector('.stat__unit').textContent, !!c.querySelector('.meter'), (c.querySelector('.meter') || { dataset: {} }).dataset.tone || '']);
+      const shape = cards.map(c => [c.querySelector('.stat__label').textContent, c.querySelector('.stat__unit').textContent, !!c.querySelector('.meter'), (c.querySelector('.meter') || { dataset: {} }).dataset.tone || '', !!c.querySelector('[data-phone-curve]')]);
       const sg = JSON.stringify(shape);
-      if (kpi.__sg !== sg || kpi.children.length !== cards.length) { kpi.__sg = sg; kpi.replaceChildren(...cards); const slot = kpi.querySelector('.sig-slot'); if (slot && Neu.sigMeter) { liveSig = liveSig || Neu.sigMeter(); slot.append(liveSig); } return; }
+      if (kpi.__sg !== sg || kpi.children.length !== cards.length) { kpi.__sg = sg; kpi.replaceChildren(...cards); upSig(); phoneDraw(); return; }
       cards.forEach((n, i) => {
         const o = kpi.children[i], ov = o.querySelector('.stat__value'), nv = n.querySelector('.stat__value');
         if (ov.firstChild && nv.firstChild && ov.firstChild.nodeValue !== nv.firstChild.nodeValue) ov.firstChild.nodeValue = nv.firstChild.nodeValue;
         const om = o.querySelector('.meter > span'), nm = n.querySelector('.meter > span'); if (om && nm) om.setAttribute('style', nm.getAttribute('style'));
         const ox = o.querySelector('.card__body > .muted'), nx = n.querySelector('.card__body > .muted'); if (ox && nx && ox.textContent !== nx.textContent) ox.textContent = nx.textContent;
       });
+      upSig(); phoneDraw();
     }
 
     function renderLines() {
@@ -366,6 +417,8 @@
     App.on('metrics', () => { renderKpi(); renderLines(); renderCams(); renderAlerts(); renderHero(); renderDet(); });
     App.data['send:refresh'] = poll('send', '/api/send', 2000);
     App.data['metrics:refresh'] = poll('metrics', '/api/metrics', 2000);
+    poll('hdmi', '/api/hdmi', 4000, () => App.view === 'live');
+    App.on('hdmi', renderKpi);
     poll('srtla', '/api/srtla', 5000);
   });
 })();
