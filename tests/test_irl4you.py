@@ -697,7 +697,7 @@ class TestSendekette(unittest.TestCase):
                                                     {"ip": "10.0.2.2", "dev": "wlan0", "state": "down", "rtt_ms": None}]}, f)
             self.netstate.iface_ips = lambda: [{"iface": "eth0", "ip": "10.0.0.2"}, {"iface": "wwan0", "ip": "10.0.1.2"}, {"iface": "wlan0", "ip": "10.0.2.2"}]
             st = self.netstate.uplink_states(["eth0", "wwan0", "wlan0"])
-            self.assertEqual(st["eth0"], {"state": "an", "srtt": 38})
+            self.assertEqual(st["eth0"], {"state": "an", "srtt": 38.5}, "eine Nachkommastelle: im Heimnetz liegt die Laufzeit unter 1 ms")
             self.assertEqual(st["wwan0"], {"state": "reserve", "srtt": None})
             self.assertEqual(st["wlan0"]["state"], "aus")
         finally:
