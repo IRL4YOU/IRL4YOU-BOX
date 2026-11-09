@@ -296,7 +296,8 @@ DELAY_KEYS = ("main_delay_ms", "pip_delay_ms", "pip2_delay_ms", "pip3_delay_ms")
 FRAME_MS = 33
 
 
-PENDING_LABELS = (("server", "SRTLA-Server"), ("bitrate", "Bitrate"), ("latency", "Latenz"), ("spread", "Verteilung"))
+# Die Bitrate fehlt hier absichtlich: Der Sender übernimmt Minimum und Maximum im laufenden Betrieb (pipbox_send.refresh_bitrate), kein Neustart nötig.
+PENDING_LABELS = (("server", "SRTLA-Server"), ("latency", "Latenz"), ("spread", "Verteilung"))
 
 
 def srtla_signature(data):

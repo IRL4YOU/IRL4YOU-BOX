@@ -44,7 +44,7 @@ PHONE_EVERY_S = 3.0                    # so oft reicht die Handyzeile für den D
 
 
 def phone_values(d):
-    """Prüft die Handydaten der App: bat 0..100, chg 0/1, cur in mA (Betrag unter 10000), temp in °C (-20..90), thermal 0..6; Unplausibles wird weggelassen"""
+    """Prüft die Handydaten der App: bat 0..100, chg/plug/cur_cal 0/1, cur in mA (netto am Akku, Betrag unter 10000), temp in °C (-20..90), thermal 0..6; Unplausibles wird weggelassen"""
     def num(k, lo, hi, digits=None):
         v = d.get(k)
         if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or not lo <= v <= hi:
@@ -54,9 +54,10 @@ def phone_values(d):
     for k, v in (("bat", num("bat", 0, 100)), ("cur", num("cur", -9999, 9999)), ("temp", num("temp", -20, 90, 1)), ("thermal", num("thermal", 0, 6))):
         if v is not None:
             out[k] = v
-    chg = d.get("chg")
-    if chg in (0, 1, True, False):
-        out["chg"] = 1 if chg else 0
+    for k in ("chg", "plug", "cur_cal"):                 # chg: lädt; plug: Kabel steckt; cur_cal: App kennt die Stromrichtung (ohne sie fehlt cur)
+        v = d.get(k)
+        if v in (0, 1, True, False):
+            out[k] = 1 if v else 0
     return out
 
 

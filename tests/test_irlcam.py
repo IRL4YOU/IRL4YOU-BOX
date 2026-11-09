@@ -243,6 +243,10 @@ class TestIrlcamDienst(unittest.TestCase):
         msgs = [r.getMessage() for r in cm.records]
         self.assertEqual(msgs, ["IRL4YOU Cam: Handy Akku 97 %, lädt, 312 mA, 31.5 °C", "IRL4YOU Cam: Handy Akku 96 %, lädt nicht",
                                 "IRL4YOU Cam: Handy Akku 95 %, lädt nicht"])
+        with self.assertLogs("pipbox-hdmi", level="INFO") as cm:
+            self.t += self.hd.PHONE_LOG_S
+            d._phone_seen(json.dumps({"bat": 92, "chg": 1, "plug": 1, "cur_cal": 0, "temp": 30.0}))
+        self.assertEqual([r.getMessage() for r in cm.records], ["IRL4YOU Cam: Handy Akku 92 %, lädt, Stromrichtung noch nicht erkannt, Kabel, 30.0 °C"])
 
 
 class FakeRtmp:
@@ -595,13 +599,19 @@ class TestIrlcamHilfsprogramm(unittest.TestCase):
             stat(bat=150, chg=1, cur=99999, temp="heiß", thermal=9)                 # Unsinn wird weggelassen, nur chg bleibt
             t[0] += 3.5
             stat(bat=True, temp=float("nan"))                                       # nichts Brauchbares: keine Zeile
+            t[0] += 3.5
+            stat(bat=92, chg=1, plug=1, cur_cal=0, temp=30.0)                       # Richtung noch nicht erkannt: cur fehlt, cur_cal=0 kommt mit
+            t[0] += 3.5
+            stat(bat=93, chg=1, plug=True, cur_cal=1, cur=300, temp=30.0, extra=5)  # erkannt; unbekannte Felder fallen weg
         finally:
             ac.say = orig
         z = [x for x in zeilen if x.startswith("Handy: ")]
         self.assertEqual([json.loads(x[7:]) for x in z], [
             {"bat": 97, "cur": 312, "temp": 31.5, "thermal": 0, "chg": 1},
             {"bat": 96, "cur": -150, "temp": 31.5, "chg": 0},
-            {"chg": 1}])
+            {"chg": 1},
+            {"bat": 92, "temp": 30.0, "chg": 1, "plug": 1, "cur_cal": 0},
+            {"bat": 93, "cur": 300, "temp": 30.0, "chg": 1, "plug": 1, "cur_cal": 1}])
         self.assertTrue(irl("hdmi_daemon").PHONE_LINE_RE.match(z[0]))
 
 
@@ -631,14 +641,40 @@ class TestIrlcamOberflaeche(unittest.TestCase):
             for k in ("lädt nicht", "Akkuverlauf", "letzte {1}"):
                 self.assertIn(k, d, sprache)
 
+    def test_einzelbild_kette_versteht_h264_und_hevc(self):
+        """Handy-Apps senden H.265: die Einzelbild-Kette (type single) darf nicht nur h264parse vor den Dekoder setzen (Encoder-Absturz)."""
+        irl("hdmi_daemon")
+        pipeline = irl("webui.pipeline")
+        pl = irl("pipbox_live")
+        store = pipeline.PipelineStore(os.path.join(tempfile.mkdtemp(), "pipeline.json"))
+        cfg = dict(store.cfg, type="single", main="hdmi", pip="")
+        for fix in (True, False):
+            orig = pl.flvfix_ok
+            pl.flvfix_ok = lambda fix=fix: fix
+            try:
+                text = store.build(cfg)
+            finally:
+                pl.flvfix_ok = orig
+            self.assertIn("rtmp2src", text)
+            self.assertNotIn("rtmpsrc", text)
+            self.assertIn("rtmp://127.0.0.1:1935/publish/hdmi", text)
+            self.assertIn("mppvideodec", text)
+            self.assertIn("demux.audio", text)                                      # Ton hängt weiter am Demuxer "demux"
+            if fix:
+                self.assertIn("video/x-h264 ! h264parse", text)
+                self.assertIn("video/x-h265 ! h265parse", text)
+            else:
+                self.assertIn("parsebin", text)
+            self.assertNotIn("demux.video !\nqueue max-size-time=10000000000 max-size-buffers=1000 max-size-bytes=41943040 !\nh264parse ! mppvideodec", text)
+
     def test_webdienst_reicht_handydaten_durch(self):
         irl("hdmi_daemon")
         from webui import camservices
         svc = camservices.HdmiService(tempfile.mkdtemp(), None)
         antwort = {"state": "streaming", "settings": {}, "usb": {"present": True},
-                   "phone": {"bat": 95, "chg": 1, "cur": -308, "temp": 36.6, "thermal": 0, "boese": 1, "x": "text", "y": True}}
+                   "phone": {"bat": 95, "chg": 1, "plug": 1, "cur_cal": 1, "cur": -308, "temp": 36.6, "thermal": 0, "boese": 1, "x": "text", "y": True}}
         svc._call = lambda req, timeout=4: antwort
-        self.assertEqual(svc.status()["phone"], {"bat": 95, "chg": 1, "cur": -308, "temp": 36.6, "thermal": 0})
+        self.assertEqual(svc.status()["phone"], {"bat": 95, "chg": 1, "plug": 1, "cur_cal": 1, "cur": -308, "temp": 36.6, "thermal": 0})
         svc._hit = (0.0, None)
         antwort = {"state": "streaming", "settings": {}, "usb": {"present": True}}      # ohne Handydaten: kein Feld, keine Kachel
         self.assertNotIn("phone", svc.status())

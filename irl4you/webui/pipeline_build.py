@@ -201,8 +201,8 @@ class PipelineBuild:
         plan = (self.always_plan(c) or self.swap_plan(c)) if pip else None
         if plan:
             return self._build_dual(c, plan, base, small, xy, pip2, pip3, sty)
-        out.append(f"rtmpsrc location={base}/{c['main']} do-timestamp=true !\nflvdemux name=demux\n")
         if pip:
+            out.append(f"rtmpsrc location={base}/{c['main']} do-timestamp=true !\nflvdemux name=demux\n")
             v = (f"demux.video !\n{qv} !\nh264parse ! mppvideodec !\n"
                  "video/x-raw,format=NV12 !\n"
                  f"pbpipmix name=pipmix corner={c['corner']}{xy(c, 'x', 'y', c['corner'])} width-pct={c['size_pct']}{sty(0, 1)}"
@@ -211,8 +211,9 @@ class PipelineBuild:
                  + (f"pbpipmix name=pipmix2 slot=1 corner={c['corner2']}{xy(c, 'x', 'y', c['corner2'])} width-pct={c['size_pct']}{sty(1, 1)} !\n" if pip2 and not multi else "") +
                  "queue max-size-time=500000000 max-size-buffers=4 leaky=downstream !\n")
         else:
-            v = (f"demux.video !\n{q} !\nh264parse ! mppvideodec !\n"
-                 "videorate ! video/x-raw,framerate=30/1,format=NV12 ! queue !\n")
+            # Einzelbild: Eingang wie in der Live-Kette, damit auch HEVC (H.265) der Handy-Apps ankommt (mit h264parse allein stürzte der Encoder ab)
+            v = (pipbox_live.cam_video_head("demux", pipbox_live.flvfix_ok()).replace("@LOC@", f"{base}/{c['main']}")
+                 + "mppvideodec !\nvideorate ! video/x-raw,framerate=30/1,format=NV12 ! queue !\n")
         v += pipbox_live.venc_chain(q) + ".\n"
         out.append(v)
         vol = "volume name=avol ! " if pip and plugin_view() else ""

@@ -363,6 +363,7 @@ class Sender:
     def __init__(self, sv, lat, ips, plan=None):
         self.sv, self.lat, self.ips = sv, lat, ips
         self.bitrate_full = None
+        self.soft_active = False          # der weiche Start läuft noch (Bitrate-Datei steht dann auf der Startbitrate)
         self.soft_lock = threading.Lock()
         plan = plan or {"cfg": {}, "layout": (), "auto": False}
         self.plan = plan
@@ -386,6 +387,7 @@ class Sender:
         self.waiting = False
         self.senv = None
         self._ups_t = 0
+        self._br_t = 0
         self._cfg_mt = None
         self._inact_mt = None
         self.stats = collections.deque(maxlen=STATS_KEEP)
@@ -522,6 +524,38 @@ class Sender:
                 self.soft_start_phase(p, 2, start)
             except Exception:
                 pass
+        finally:
+            self.soft_active = False
+
+    def refresh_bitrate(self):
+        """Geänderte Bitrate-Grenzen (Netzwerk > Server > Minimum/Maximum) ohne Neustart an den Encoder geben: Datei neu schreiben, Signal HUP.
+        Während des weichen Starts nur merken (die letzte Phase schreibt dann die neuen Grenzen). Gibt True zurück, wenn etwas geändert wurde."""
+        srt = load_json(f"{STATE}/srtla.json")
+        st = {**server.SrtlaStore.DEFAULT_SETTINGS, **srt.get("settings", {})}
+        try:
+            mn, mx = int(st["min_kbps"]), int(st["max_kbps"])
+        except (KeyError, TypeError, ValueError):
+            return False
+        if not 100 <= mn < mx <= 20000:
+            return False
+        sig = server.srtla_signature(srt)["bitrate"]
+        applied = self.plan.setdefault("sig", {})
+        if not isinstance(applied, dict) or applied.get("bitrate") == sig:
+            return False
+        p = self.procs.get("encoder")
+        if p is None or p.poll() is not None:
+            return False                                         # läuft kein Encoder: der nächste Start liest die neuen Grenzen
+        with self.soft_lock:
+            if self.bitrate_full is not None:
+                self.bitrate_full = (mn, mx)
+            soft = self.soft_active
+            if not soft:
+                self.write_bitrate(mn, mx)
+        if not soft and self.hup_ready(p):
+            p.send_signal(signal.SIGHUP)
+        applied["bitrate"] = sig
+        print(f"send: Bitrate {mn} bis {mx} kbit/s übernommen (ohne Neustart)", flush=True)
+        return True
 
     def soft_start_phase(self, p, phase, start):
         mn, mx = self.bitrate_full or (None, None)
@@ -556,6 +590,7 @@ class Sender:
         with self.lock:
             self.procs[name] = p
         if soft:
+            self.soft_active = True
             threading.Thread(target=self.soft_start_run, args=(p, soft, t0), daemon=True).start()
         if name == "encoder" and self.watch is not None:
             self.watch.started_now()
@@ -774,6 +809,12 @@ class Sender:
                     self.refresh_uplinks()
             except Exception as e:
                 print(f"send: Netze konnten nicht neu gelesen werden ({type(e).__name__})", flush=True)
+            try:
+                if time.monotonic() - self._br_t >= 3:
+                    self._br_t = time.monotonic()
+                    self.refresh_bitrate()
+            except Exception as e:
+                print(f"send: Bitrate konnte nicht übernommen werden ({type(e).__name__})", flush=True)
             if self.always is None:
                 self.write_status()
                 self.flush_stats()
