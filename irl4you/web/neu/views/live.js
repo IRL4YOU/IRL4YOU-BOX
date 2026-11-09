@@ -293,7 +293,7 @@
       /* Netto-Strom am Akku (Android-Vorgabe: plus = lädt, minus = Akku sinkt). Der Status „lädt“ allein sagt nichts: Mit zu schwachem Netzteil sinkt der Akku trotzdem. */
       const net = p.cur != null ? p.cur : null, up = net != null ? net > 0 : !!p.chg;
       const hot = p.temp != null && p.temp >= 45 ? 'danger' : p.temp != null && p.temp >= 42 ? 'warn' : '';
-      const curTone = up ? 'ok' : p.bat <= 15 ? 'danger' : 'warn';                                      // grün = lädt, orange = Akku sinkt, rot = fast leer
+      const curTone = net == null ? '' : up ? 'ok' : p.bat <= 15 ? 'danger' : 'warn';                  // ohne Stromwert (App erkennt die Richtung noch) neutral                                      // grün = lädt, orange = Akku sinkt, rot = fast leer
       const amount = net != null ? `${net > 0 ? '+' : '\u2212'}${Math.abs(net)} mA` : (p.chg ? 'lädt' : 'lädt nicht');   // ohne Stromwert nur das Wort
       const hist = Array.isArray(p.hist) && p.hist.length > 1 ? p.hist : null, mins = hist ? Math.round(hist[0][0] / 60) : 0;
       const spanTxt = !hist ? '' : mins < 60 ? `${Math.max(1, mins)} min` : `${Math.floor(mins / 60)} h ${mins % 60} min`;
@@ -312,7 +312,7 @@
     /* Kurve des Akkuverlaufs (die Box merkt sich 6 Stunden, ein Punkt je Minute), gleiches Aussehen wie die Kurve bei Upload; die Skala läuft vom niedrigsten bis zum höchsten Stand */
     const phoneDraw = () => {
       const cur = kpi.querySelector('[data-phone-cur]'), tmp = kpi.querySelector('[data-phone-temp]');
-      if (cur) { const sg = phoneInfo.curTone + '|' + phoneInfo.amount; if (cur.__sg !== sg) { cur.__sg = sg; cur.replaceChildren(h('strong', { style: `color:var(--${phoneInfo.curTone})`, text: phoneInfo.amount })); } }      // Strom in der Farbe des Ladens
+      if (cur) { const sg = phoneInfo.curTone + '|' + phoneInfo.amount; if (cur.__sg !== sg) { cur.__sg = sg; cur.replaceChildren(h('strong', { style: `color:var(--${phoneInfo.curTone || 'text-2'})`, text: phoneInfo.amount })); } }      // Strom in der Farbe des Ladens
       if (tmp) { const sg = phoneInfo.hot + '|' + phoneInfo.temp; if (tmp.__sg !== sg) { tmp.__sg = sg; tmp.textContent = phoneInfo.temp; tmp.style.color = phoneInfo.hot ? `var(--${phoneInfo.hot})` : ''; } }
       const slot = kpi.querySelector('[data-phone-curve]'), hist = ((App.data.hdmi || {}).phone || {}).hist;
       if (!slot || !Array.isArray(hist) || hist.length < 2) return;
