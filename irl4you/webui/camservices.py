@@ -449,7 +449,7 @@ class HdmiService:
                     out[k] = resp[k]
             ph = resp.get("phone")
             if isinstance(ph, dict):                 # Handydaten der IRL4YOU Cam (nur mit angestecktem Handy): nur bekannte Felder, nur Zahlen
-                ph = {k: v for k, v in ph.items() if k in ("bat", "chg", "cur", "temp", "thermal") and isinstance(v, (int, float)) and not isinstance(v, bool)}
+                ph = {k: v for k, v in ph.items() if k in ("bat", "chg", "plug", "cur", "cur_cal", "temp", "thermal") and isinstance(v, (int, float)) and not isinstance(v, bool)}
                 hist = resp["phone"].get("hist")
                 if ph and isinstance(hist, list):
                     ph["hist"] = [[int(a), int(b)] for a, b in (x for x in hist[-400:] if isinstance(x, list) and len(x) == 2
