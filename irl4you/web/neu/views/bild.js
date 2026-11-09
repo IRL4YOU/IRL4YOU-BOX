@@ -3,7 +3,7 @@
   'use strict';
   const { h, api, App, poll, ask, toast, run, badge, btn, alertBox, card, sw, field, input, select, seg, range, disclosure, pageHead, view, note, sleep } = Neu;
   const FREE = '5', CW = 1920, CH = 1080, KEEP = 32;
-  const KEYS = ['type', 'main', 'pip', 'corner', 'pip2', 'corner2', 'pip3', 'corner3', 'x', 'y', 'x2', 'y2', 'x3', 'y3', 'size_pct', 'size_pct2', 'size_pct3', 'audio', 'auto_failover', 'styles', 'main_delay_ms', 'pip_delay_ms', 'pip2_delay_ms', 'pip3_delay_ms'];
+  const KEYS = ['type', 'main', 'pip', 'corner', 'pip2', 'corner2', 'pip3', 'corner3', 'x', 'y', 'x2', 'y2', 'x3', 'y3', 'size_pct', 'size_pct2', 'size_pct3', 'audio', 'auto_failover', 'styles', 'main_delay_ms', 'pip_delay_ms', 'pip2_delay_ms', 'pip3_delay_ms', 'mic_offset_ms'];
   const STYLE = () => ({ visible: true, opacity: 100, crop: { l: 0, r: 0, t: 0, b: 0 }, radius: 0, border: { enabled: false, width: 6, color: '#ffffff', opacity: 100 } });
   const clampN = (v, lo, hi, d) => { v = Math.round(+v); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); };
   const sfx = i => i === 1 ? '' : String(i), slotKey = i => i === 1 ? 'pip' : 'pip' + i;
@@ -61,7 +61,7 @@
       let c1 = ids.includes(String(cfg.corner)) ? String(cfg.corner) : '3'; let c2 = String(cfg.corner2); if (taken(c2, [c1]) || !ids.includes(c2)) c2 = ids.find(i => !taken(i, [c1])) || '';
       let c3 = String(cfg.corner3); if (taken(c3, [c1, c2]) || !ids.includes(c3)) c3 = ids.find(i => !taken(i, [c1, c2])) || '';
       cfg.corner = +c1; cfg.corner2 = c2 === '' ? 2 : +c2; cfg.corner3 = c3 === '' ? 0 : +c3;
-      const ok = [['main', main], ['pip', pip], ['pip2', cfg.pip2], ['pip3', cfg.pip3]].filter(x => x[1]).map(x => x[0]); if (!ok.includes(cfg.audio)) cfg.audio = 'main';
+      const ok = [['main', main], ['pip', pip], ['pip2', cfg.pip2], ['pip3', cfg.pip3]].filter(x => x[1]).map(x => x[0]); if (cfg.audio !== 'mic' && !ok.includes(cfg.audio)) cfg.audio = 'main';
     }
     const camOpt = (k, selected) => [k.key, `${k.name}${cams.filter(x => x.name === k.name).length > 1 ? ' (' + k.key + ')' : ''}${k.state === 'live' ? ' · sendet' : ''}`];
 
@@ -88,12 +88,14 @@
         camSel.disabled = !usedAbove; const used = [1, 2, 3].filter(j => j !== i).map(j => String(cfg['corner' + sfx(j)]));
         const cornSel = select(corners.map((n, j) => [j, n]).filter(([j]) => String(j) === FREE || !used.includes(String(j)) || String(j) === String(cfg['corner' + s])), cfg['corner' + s], v => { cfg['corner' + s] = +v; constrain(); mark(); paint(); buildControls(); }); cornSel.disabled = !cfg[k];
         return [field({ s: `Kamera für kleines Bild ${i}`, k: 'bild in bild pip kamera klein', label: `Kamera für kleines Bild ${i}`, control: camSel }), field({ s: `Ecke von Bild ${i}`, k: 'pip ecke position frei', label: 'Ecke', control: cornSel }), range({ s: `Größe von Bild ${i}`, k: 'pip größe prozent skalierung', label: 'Größe (Prozent des Hauptbilds)', min: 1, max: 100, value: Math.max(1, Math.min(100, +cfg['size_pct' + s] || 25)), unit: ' %', oninput: v => { cfg['size_pct' + s] = v; paint(); }, onchange: () => mark() }), delayCtl(DELAY[i], `Verzögerung von Bild ${i}`), ...(d.plugin_style === false && d.plugin_present ? [] : [styleBlock(i)])]; };
-      const au = [['main', cfg.main ? `Hauptbild (${nm(cfg.main)})` : 'Hauptbild'], ...[1, 2, 3].filter(i => cfg[slotKey(i)] && pip).map(i => [slotKey(i), `Kleines Bild ${i} (${nm(cfg[slotKey(i)])})`])];
+      const au = [['main', cfg.main ? `Hauptbild (${nm(cfg.main)})` : 'Hauptbild'], ...[1, 2, 3].filter(i => cfg[slotKey(i)] && pip).map(i => [slotKey(i), `Kleines Bild ${i} (${nm(cfg[slotKey(i)])})`])].concat([['mic', 'Mikrofon (USB)']]);
       kids.push(card({ title: 'Aufbau', body: [
         field({ s: 'Art des Bildaufbaus', k: 'bild in bild pip einzeln eine kamera', label: 'Art', control: h('div', null, seg('ptype', [['single', 'Eine Kamera'], ['pip', 'Bild in Bild']], cfg.type, v => { cfg.type = v; constrain(); mark(); paint(); buildControls(); }, 'Art des Bildaufbaus')) }),
         field({ s: 'Hauptkamera', k: 'bild haupt quelle kamera', label: 'Hauptkamera', hint: 'Das große Bild im Hintergrund.', control: select(cams.map(c => camOpt(c)), cfg.main, v => { const prev = cfg.main; cfg.main = v; ['pip', 'pip2', 'pip3'].forEach(k => { if (cfg[k] === v && prev && prev !== v) cfg[k] = prev; }); constrain(); mark(); paint(); buildControls(); }) }),
-        field({ s: 'Ton von', k: 'audio mikrofon ton quelle', label: 'Ton von', control: select(au, cfg.audio, v => { cfg.audio = v; mark(); }) }),
-        delayCtl(DELAY[0], 'Verzögerung des Hauptbilds'), h('p', { class: 'field__hint', text: 'Das Hauptbild wartet samt Ton vor dem Einblenden. 0 = aus.' }),
+        field({ s: 'Ton von', k: 'audio mikrofon ton quelle', label: 'Ton von', control: select(au, cfg.audio, v => { cfg.audio = v; mark(); buildControls(); }) }),
+        ...(cfg.audio === 'mic' ? [range({ label: 'Ton-Versatz (ms)', min: 0, max: 1500, step: 10, value: Math.max(0, Math.min(1500, +cfg.mic_offset_ms || 0)), unit: ' ms', oninput: v => { cfg.mic_offset_ms = v; }, onchange: liveDelay, s: 'Ton-Versatz', k: 'ton versatz audio verzögerung mikrofon' }),
+          h('p', { class: 'field__hint', text: 'Der Ton wartet, bevor er gesendet wird, damit er zum Bild passt. 0 = aus. Der Empfänger muss vor dem Start der Sendung stecken.' })] : []),
+        ...(pip ? [delayCtl(DELAY[0], 'Verzögerung des Hauptbilds'), h('p', { class: 'field__hint', text: 'Das Hauptbild wartet samt Ton vor dem Einblenden. 0 = aus.' })] : []),     // bei „Eine Kamera“ ohne Wirkung (nichts einzublenden), der Server speichert dort immer den Standardwert
         pip && Math.max(+cfg.main_delay_ms || 0, ...[1, 2, 3].filter(i => cfg[slotKey(i)]).map(i => +cfg[DELAY[i]] || 0)) > 750 ? alertBox({ tone: 'warn', text: 'Verzögerungen über 750 ms werden auf 750 ms begrenzt. Größere Werte ließen das Hauptbild ruckeln.' }) : null] }));
       if (pip) { kids.push(card({ title: 'Kleines Bild 1', body: slotCard(1) })); if (cfg.pip) kids.push(card({ title: 'Kleines Bild 2', body: slotCard(2) })); if (cfg.pip2) kids.push(card({ title: 'Kleines Bild 3', body: slotCard(3) })); }
       controls.replaceChildren(...kids); paint();

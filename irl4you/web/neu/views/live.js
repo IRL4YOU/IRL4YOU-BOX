@@ -334,6 +334,8 @@
     };
     /* Kurve „Upload“ in die erste Karte setzen; auch nachträglich, falls sie beim ersten Zeichnen noch nicht bereit war (kopf.js lädt unter Umständen später) */
     const upSig = () => { const slot = kpi.querySelector('.sig-slot'); if (slot && !slot.children.length && Neu.sigMeter) { liveSig = liveSig || Neu.sigMeter(); slot.append(liveSig); } };
+    /* Antwortzeit zum Server: Mittel der genutzten Leitungen (srtt aus dem Sender). Der RTT-Wert des Encoders ist nur die Strecke zum Sender auf derselben Box (immer etwa 0) und taugt dafür nicht. */
+    const rttShown = (m, send) => { const v = Object.values(m.uplinks || {}).filter(u => u && u.state === 'an' && u.srtt != null).map(u => +u.srtt); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : send.rtt_ms; };
     function renderKpi() {
       const s = App.data.send || {}, m = App.data.metrics || {}, sr = App.data.srtla;
       const send = (m.details || {}).send || {};
@@ -346,7 +348,7 @@
         stat('Prozessor', fmt(cpu, 0), '%', cpu, cpu > 90 ? 'danger' : cpu > 75 ? 'warn' : undefined, m.cpu && m.cpu.max != null ? h('span', { class: 'muted', style: 'font-size:var(--text-xs)', text: `höchster Kern ${fmt(m.cpu.max, 0)} %` }) : null),
         stat('Temperatur', fmt(temp, 0), '°C', temp != null ? temp / 100 * 100 : null, temp > 80 ? 'danger' : temp > 70 ? 'warn' : 'ok'),
         stat('Arbeitsspeicher', fmt(mem.used_pct, 0), '% belegt', mem.used_pct, mem.used_pct > 90 ? 'danger' : mem.used_pct > 80 ? 'warn' : undefined, h('span', { class: 'muted', style: 'font-size:var(--text-xs)', text: `${fmt((mem.avail_mb || 0) / 1024)} GiB frei` })),
-        ...(s.active && send.rtt_ms != null ? [stat('Antwortzeit', fmt(send.rtt_ms, 0), 'ms', null)] : []),
+        ...(s.active && rttShown(m, send) != null ? [stat('Antwortzeit', fmt(rttShown(m, send), rttShown(m, send) < 10 ? 1 : 0), 'ms', null)] : []),
         ...phoneCard(stat)];
       /* Aufbau nur ändern, wenn sich Beschriftung, Einheit oder Farbe ändern; sonst die Zahlen, Balken und die Kurve an Ort und Stelle nachtragen (kein Flackern) */
       const shape = cards.map(c => [c.querySelector('.stat__label').textContent, c.querySelector('.stat__unit').textContent, !!c.querySelector('.meter'), (c.querySelector('.meter') || { dataset: {} }).dataset.tone || '', !!c.querySelector('[data-phone-curve]')]);
