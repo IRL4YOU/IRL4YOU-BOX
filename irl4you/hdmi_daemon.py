@@ -694,7 +694,8 @@ class Daemon:
             self.phone_logged = now
             log.info("IRL4YOU Cam: Handy %s", ", ".join(x for x in (
                 "Akku %s %%" % d["bat"] if "bat" in d else "", ("lädt" if d["chg"] else "lädt nicht") if "chg" in d else "",
-                "%s mA" % d["cur"] if "cur" in d else "", "%s °C" % d["temp"] if "temp" in d else "",
+                "%s mA" % d["cur"] if "cur" in d else ("Stromrichtung noch nicht erkannt" if d.get("cur_cal") == 0 else ""),
+                ("Kabel" if d["plug"] else "ohne Kabel") if "plug" in d else "", "%s °C" % d["temp"] if "temp" in d else "",
                 "Hitzestufe %s" % d["thermal"] if d.get("thermal") else "") if x))
 
     def phone_now(self):
