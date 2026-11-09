@@ -26,7 +26,7 @@ def uplink_states(selected):
     for l in links:
         if isinstance(l, dict) and isinstance(l.get("ip"), str) and l.get("state") in ("used", "reserve"):
             rtt = l.get("rtt_ms")
-            last[l["ip"]] = (int(rtt) if isinstance(rtt, (int, float)) else -1, "genutzt" if l["state"] == "used" else "reserve")
+            last[l["ip"]] = (round(float(rtt), 1) if isinstance(rtt, (int, float)) else -1, "genutzt" if l["state"] == "used" else "reserve")
     by_ip = {o["ip"]: o["iface"] for o in iface_ips()}
     seen = {by_ip[ip]: v for ip, v in last.items() if ip in by_ip}
     out = {}
