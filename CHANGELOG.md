@@ -7,6 +7,7 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - IRL4YOU Cam: Android-Handy mit der App „IRL4YOU Cam“ per USB-Kabel als Kamera (Kameras > HDMI und USB > Quelle „IRL4YOU Cam“), ohne Netzwerk und ohne USB-Debugging; Bild und Ton gehen unverändert durch, die Box stellt die Bitrate auf höchstens 10 Mbit/s.
 - Live: Kachel „Handy“ mit Akku, Strom, Temperatur und Akkukurve des Android-Handys, solange es per USB mit der IRL4YOU Cam sendet (Strom grün beim Laden, orange wenn der Akku sinkt); die Kennzahlen-Karten sind alle gleich groß.
 - Bitrate-Grenzen (Netzwerk > Server) gelten sofort, ohne die Sendung neu zu starten; die Einzelbild-Kette nimmt jetzt auch H.265 von Handy-Apps an.
+- Ton von einem USB-Mikrofon (zum Beispiel DJI-Empfänger): bei der IRL4YOU Cam und im Bildaufbau („Ton von“), mit Regler für den Ton-Versatz; die Karte „Antwortzeit“ zeigt die Laufzeit der Leitung.
 - Testbild als Kamera-Quelle: bewegtes Wellenmuster mit Schrift, Zeit und Logo, Stereo-Testton (links 440, rechts 660 Hz).
 - Leitungstest: „Testen“ je Leitung und „Alle Leitungen testen“ (Herunterladen, Hochladen, Antwortzeit, auch während der Sendung).
 - Update-Prüfung alle 2 Stunden mit niedrigster Priorität; „Nach Updates suchen“ wartet auf das Ergebnis, auch während der Sendung.
