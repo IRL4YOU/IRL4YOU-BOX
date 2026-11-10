@@ -9,7 +9,7 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - Bitrate-Grenzen (Netzwerk > Server) gelten sofort, ohne die Sendung neu zu starten; die Einzelbild-Kette nimmt jetzt auch H.265 von Handy-Apps an.
 - Ton von einem USB-Mikrofon (zum Beispiel DJI-Empfänger): bei der IRL4YOU Cam und im Bildaufbau („Ton von“), mit Regler für den Ton-Versatz; die Karte „Antwortzeit“ zeigt die Laufzeit der Leitung.
 - IRL4YOU Cam: „Ohne Ton“ sendet jetzt Stille, die Sendung bleibt dabei bestehen.
-- Bild: Steht das Handy der IRL4YOU Cam hochkant, sitzt es links oder rechts in voller Höhe, die andere Kamera füllt den Rest („Hauptbild hochkant“, als kleines Bild „Hochkant-Bild“).
+- IRL4YOU Cam: Hochkant-Bild wechselt automatisch. Steht das Handy hochkant, sitzt es als kleines Bild in voller Höhe links, in der Mitte oder rechts (Bild > „Hochkant-Bild“), die andere Kamera bleibt daneben sichtbar. Ist die IRL4YOU Cam das Hauptbild, sitzt sie links oder rechts in voller Höhe, und die zweite Kamera füllt automatisch den restlichen Platz (Bild > „Hauptbild hochkant“). Wird das Handy wieder quer gehalten, kommt das normale Bild ohne Neustart der Sendung zurück. Gilt nur für die IRL4YOU Cam (Android-Handy per USB), nicht für andere Kameras.
 - Testbild als Kamera-Quelle: bewegtes Wellenmuster mit Schrift, Zeit und Logo, Stereo-Testton (links 440, rechts 660 Hz).
 - Leitungstest: „Testen“ je Leitung und „Alle Leitungen testen“ (Herunterladen, Hochladen, Antwortzeit, auch während der Sendung).
 - Update-Prüfung alle 2 Stunden mit niedrigster Priorität; „Nach Updates suchen“ wartet auf das Ergebnis, auch während der Sendung.
