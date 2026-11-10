@@ -748,6 +748,36 @@ class TestUsbMikrofon(unittest.TestCase):
         self.assertEqual(got[0], (b"x" * 40, bytes([0x11, 0x90]), 48000))
         self.assertEqual(starts[0][3], "device=plughw:CARD=Rx")
 
+    def test_ohne_ton_sendet_stille(self):
+        """„Ohne Ton“: die Box braucht eine Tonspur (sonst steht die Sendekette), also kommt Stille statt keinem Ton, und es wird keine Tonkarte gesucht."""
+        import io
+        got, starts = [], []
+
+        class P:
+            def __init__(self, data):
+                self.stdout = io.BytesIO(data)
+
+            def kill(self):
+                pass
+
+            def wait(self, timeout=None):
+                pass
+        sess = types.SimpleNamespace(closed=False, clock=lambda: 10.0, on_mic_frame=lambda raw, asc, rate, t: got.append(raw))
+
+        def spawn(argv, **kw):
+            starts.append(argv)
+            return P(_adts(b"s" * 20))
+
+        def sleep(sec):
+            sess.closed = True
+        ac.UsbMic(sess, asound="/gibt/es/nicht", spawn=spawn, sleep=sleep, silent=True).run()
+        self.assertEqual(len(starts), 1)
+        self.assertIn("audiotestsrc", starts[0])
+        self.assertIn("wave=silence", starts[0])
+        self.assertNotIn("alsasrc", starts[0])
+        self.assertEqual(got, [b"s" * 20])
+        self.assertTrue(ac.Session.has_audio(types.SimpleNamespace(args=types.SimpleNamespace(audio="none"), cfg={"audio": {"ch": 0}})))
+
     def test_ohne_tonkarte_wird_gewartet(self):
         d = tempfile.mkdtemp()
         sess = types.SimpleNamespace(closed=False, clock=lambda: 0.0, on_mic_frame=lambda *a: None)
