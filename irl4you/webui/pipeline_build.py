@@ -29,6 +29,12 @@ class PipelineBuild:
             num(k, SIZE_MIN, SIZE_MAX)
         for k in ("x", "y", "x2", "y2", "x3", "y3"):
             num(k, 0, 1000)
+        for k in ("portrait", "portrait2", "portrait3"):
+            num(k, 0, 3)
+        out.setdefault("portrait_main", 0)
+        num("portrait_main", 0, 3)
+        if out["portrait_main"] == 2:
+            out["portrait_main"] = 0
         for k in ("main_delay_ms", "pip_delay_ms", "pip2_delay_ms", "pip3_delay_ms"):
             num(k, 0, 3000)
         out.setdefault("mic_offset_ms", 0)

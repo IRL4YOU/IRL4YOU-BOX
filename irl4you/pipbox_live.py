@@ -186,12 +186,20 @@ def small_geometry(c, k):
             "bcolor": int(br["color"][1:], 16), "bopacity": int(br["opacity"])}
 
 
+PORTRAIT_MODES = ("", "links", "mitte", "rechts")        # Einstellung „portrait“ je kleinem Bild: 0 = Größe und Ecke wie im Querformat, 1 bis 3 = ganze Höhe an dieser Stelle
+
+
 def portrait_geometry(c, k, g, dims):
     sfx = "" if k == 1 else str(k)
-    h = g["sh"]
+    mode = c.get("portrait" + sfx, 0)
+    mode = mode if isinstance(mode, int) and not isinstance(mode, bool) and 0 <= mode <= 3 else 0
+    h = CANVAS_H if mode else g["sh"]
     w = (h * dims[0] // dims[1]) & ~1
     margin = (CANVAS_W // 60) & ~1
-    x, y = place(c["corner" + sfx], CANVAS_W, CANVAS_H, w, h, margin, c["x" + sfx], c["y" + sfx])
+    if mode:
+        x, y = (0, (CANVAS_W - w) // 2, CANVAS_W - w)[mode - 1], 0
+    else:
+        x, y = place(c["corner" + sfx], CANVAS_W, CANVAS_H, w, h, margin, c["x" + sfx], c["y" + sfx])
     g2 = dict(g)
     g2.update(crop=(0, 0, 0, 0), w=w, h=h, x=x & ~1, y=y & ~1)
     if g["bw"]:
@@ -440,6 +448,35 @@ def order_for_swap(lines, old_caps, alpha):
     return out + [WAIT_MARK] + later if later else out
 
 
+def main_portrait_layout(c, dims, main_slot, pip_slot):
+    """Hauptbild ist ein hochkant stehendes Handy (Einstellung „portrait_main“: 1 links, 3 rechts): das Handy in ganzer Höhe am Rand, die andere Kamera füllt
+    den restlichen Platz. Liefert (Rechteck des Handys, Rechteck der anderen Kamera oder None) oder None, wenn nichts zu tun ist."""
+    mode = c.get("portrait_main", 0)
+    if mode not in (1, 3) or isinstance(mode, bool) or main_slot is None:
+        return None
+    d = dims.get(main_slot)
+    if not d or not d[0] or not d[1] or d[1] <= d[0]:
+        return None
+    w = (CANVAS_H * d[0] // d[1]) & ~1
+    if w < 16 or w >= CANVAS_W - 16:
+        return None
+    me = (0 if mode == 1 else CANVAS_W - w, 0, w, CANVAS_H)
+    fill = ((w if mode == 1 else 0), 0, CANVAS_W - w, CANVAS_H) if pip_slot is not None else None
+    return me, fill
+
+
+def fill_crop(src_w, src_h, tw, th):
+    """Zuschnitt (links, rechts, oben, unten) eines Bilds src_w×src_h, damit es das Rechteck tw×th ohne Ränder ausfüllt (mittig, gerade Werte)."""
+    src_w, src_h = src_w or 1920, src_h or 1080
+    if src_w * th > src_h * tw:                    # Quelle ist breiter als das Ziel: links und rechts abschneiden
+        keep = (src_h * tw // th) & ~1
+        cut = max(0, (src_w - keep) // 2) & ~1
+        return cut, cut, 0, 0
+    keep = (src_w * th // tw) & ~1
+    cut = max(0, (src_h - keep) // 2) & ~1
+    return 0, 0, cut, cut
+
+
 class Layout:
 
     def __init__(self):
@@ -460,15 +497,29 @@ class Layout:
         def add(key, line, z):
             want.append((key, line, z))
 
+        mp = main_portrait_layout(c, dims, by_pos.get(0), by_pos.get(1))
+        if mp and mp[1]:
+            fx, fy, fw, fh = mp[1]
+            geoms[1] = dict(geoms[1], x=fx, y=fy, w=fw, h=fh, crop=(0, 0, 0, 0), bw=0, radius=0)      # die andere Kamera füllt den Rest: ohne Rand und Rundung
+
         for s in range(SLOTS):
             nm = f"cam{s}"
             pos = roles.get(s)
             if pos is None:
                 add(("a", s), f"pad mix sink_{s} alpha 0", -1)
                 continue
-            if pos == 0:
+            if pos == 0 and mp:
+                x, y, w, h = mp[0]
+                crop, sw, sh, alpha, z = (0, 0, 0, 0), w, h, 1.0, Z_BIG
+            elif pos == 0:
                 x, y, w, h = 0, 0, CANVAS_W, CANVAS_H          # volle Fläche: videoscale passt jedes Bild mit Rändern ein (kein Dehnen beim Drehen)
                 crop, sw, sh, alpha, z = (0, 0, 0, 0), w, h, 1.0, Z_BIG
+            elif pos == 1 and mp and mp[1]:
+                x, y, w, h = mp[1]
+                sw0, sh0 = dims.get(s) or (1920, 1080)
+                crop = fill_crop(sw0, sh0, w, h)
+                sw, sh = w, h
+                alpha, z = (0 if (hide >> (pos - 1)) & 1 else 1.0), 2 * pos
             else:
                 g = geoms[pos]
                 x, y, w, h = g["x"], g["y"], g["w"], g["h"]
