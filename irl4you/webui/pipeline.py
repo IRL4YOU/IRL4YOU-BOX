@@ -16,7 +16,7 @@ class PipelineStore(PipelineBuild):
     DEFAULT = {"type": "single", "main": "", "pip": "", "corner": 3, "size_pct": 25, "size_pct2": 25, "size_pct3": 25, "audio": "main",
                "pip2": "", "corner2": 2, "pip3": "", "corner3": 0, "x": 500, "y": 500, "x2": 500, "y2": 500, "x3": 500, "y3": 500, "main_delay_ms": DEFAULT_MAIN_DELAY_MS,
                "pip_delay_ms": DEFAULT_PIP_DELAY_MS, "pip2_delay_ms": DEFAULT_PIP_DELAY_MS,
-               "pip3_delay_ms": DEFAULT_PIP_DELAY_MS, "auto_failover": True, "swap_cams": 0, "always_ready": False, "facecam": "", "mic_offset_ms": 0}
+               "pip3_delay_ms": DEFAULT_PIP_DELAY_MS, "auto_failover": True, "swap_cams": 0, "always_ready": False, "facecam": "", "mic_offset_ms": 0, "portrait": 0, "portrait2": 0, "portrait3": 0, "portrait_main": 0}
     # Bildaufbau ist immer Bild-in-Bild; ohne kleines Bild (eine Kamera) bleibt der Typ "single". Mit kleinem Bild gilt immer "Alle Kameras immer bereit"
     # und der Tausch des Hauptbilds über alle Kameras (keine Einstellung mehr in der Oberfläche).
 
@@ -231,7 +231,7 @@ class PipelineStore(PipelineBuild):
                "pip2": "", "corner2": 2, "pip3": "", "corner3": 0, "x": 500, "y": 500, "x2": 500, "y2": 500, "x3": 500, "y3": 500, "main_delay_ms": DEFAULT_MAIN_DELAY_MS,
                "pip_delay_ms": DEFAULT_PIP_DELAY_MS, "pip2_delay_ms": DEFAULT_PIP_DELAY_MS,
                "pip3_delay_ms": DEFAULT_PIP_DELAY_MS, "auto_failover": req.get("auto_failover", True) is not False, "swap_cams": 0,
-               "always_ready": t == "pip"}
+               "always_ready": t == "pip", "portrait": 0, "portrait2": 0, "portrait3": 0, "portrait_main": 0}
         cfg["styles"] = clean_styles(req.get("styles"), self.cfg.get("styles"), strict=True)
         try:
             moff = int(req.get("mic_offset_ms", 0) or 0)
@@ -258,6 +258,21 @@ class PipelineStore(PipelineBuild):
             if audio not in ("main", "pip", "pip2", "pip3", "mic"):
                 raise ValueError("Ton: Hauptbild, eines der kleinen Bilder oder das Mikrofon")
             cfg.update(pip=pipk, corner=corner, size_pct=pct, size_pct2=pct2, size_pct3=pct3, audio=audio)
+            try:
+                pm = int(req.get("portrait_main", 0) or 0)
+            except (TypeError, ValueError):
+                raise ValueError("Hauptbild hochkant: 0 (aus), 1 links, 3 rechts")
+            if pm not in (0, 1, 3):
+                raise ValueError("Hauptbild hochkant: 0 (aus), 1 links, 3 rechts")
+            cfg["portrait_main"] = pm
+            for key in ("portrait", "portrait2", "portrait3"):
+                try:
+                    val = int(req.get(key, 0) or 0)
+                except (TypeError, ValueError):
+                    raise ValueError("Hochkant-Bild: Zahl von 0 bis 3")
+                if not 0 <= val <= 3:
+                    raise ValueError("Hochkant-Bild: 0 (aus), 1 links, 2 Mitte, 3 rechts")
+                cfg[key] = val
             for key in ("x", "y", "x2", "y2", "x3", "y3"):
                 try:
                     val = int(req.get(key, 500))
@@ -363,9 +378,21 @@ class PipelineStore(PipelineBuild):
             self.save()
             return self.view_values(c)
 
-    def status(self, cams):
+    def phone_keys(self):
+        """Kameras, die ein Android-Handy mit der IRL4YOU Cam sind (nur sie melden ihre Ausrichtung zuverlässig; für sie gibt es „Hochkant-Bild“)."""
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(self.path)), "hdmi.json")) as f:
+                d = json.load(f)
+            if isinstance(d, dict) and d.get("source") == "irlcam" and isinstance(d.get("key"), str):
+                return {d["key"]}
+        except (OSError, ValueError):
+            pass
+        return set()
+
+    def status(self, cams, phones=None):
         keys = [c["key"] for c in cams]
-        return {"config": dict(self.cfg, styles=clean_styles(self.cfg.get("styles"))), "plugin_style": plugin_style(), "cameras": [{"key": c["key"], "name": c["name"], "state": c.get("state", "unknown"), "w": c.get("w", 0), "h": c.get("h", 0)} for c in cams],
+        phones = self.phone_keys() if phones is None else phones
+        return {"config": dict(self.cfg, styles=clean_styles(self.cfg.get("styles"))), "plugin_style": plugin_style(), "cameras": [{"key": c["key"], "name": c["name"], "state": c.get("state", "unknown"), "w": c.get("w", 0), "h": c.get("h", 0), "phone": c["key"] in phones} for c in cams],
                 "corners": list(pip_corners()), "preview": self.build() if self.cfg.get("main") in keys else "",
                 "needs_plugin": self.cfg.get("type") == "pip", "plugin_present": os.path.exists("/opt/irl4you/gst/libgstpbpip.so")}
 

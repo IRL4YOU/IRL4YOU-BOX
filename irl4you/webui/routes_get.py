@@ -8,6 +8,7 @@ import urllib.request
 
 from .actions import rotation_state
 from .auth import Auth
+from .camservices import HDMI_KEY
 from .cameras import label_bluetooth
 from .common import WEB_DIR, iface_ips, read
 from .netstate import uplink_states
@@ -192,7 +193,8 @@ class GetRoutes:
         if path == "/api/uplinktest":
             return self.reply(200, self.uplinktest.status() if self.uplinktest else {"tests": {}, "busy": False, "health": None, "sending": False})
         if path == "/api/pipeline":
-            st = self.pipeline.status(self.cams.listing(""))
+            hs = (self.hdmi.status().get("settings") or {}) if getattr(self, "hdmi", None) else {}
+            st = self.pipeline.status(self.cams.listing(""), {HDMI_KEY} if hs.get("source") == "irlcam" else set())      # Handy der IRL4YOU Cam: nur sie hat „Hochkant-Bild“
             st["live"] = {"main": self.send.delay_live(), "pips": self.send.delay_live_pips()}
             return self.reply(200, st)
         if path == "/api/send":
