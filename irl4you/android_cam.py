@@ -4,7 +4,7 @@
 Reines Python ohne Zusatzpakete (USB über /dev/bus/usb, usbfs). Eigenes Protokoll zwischen der App „IRL4YOU Cam“ und der Box,
 kein Fremdcode. Rahmen: Typ (1 Byte), Länge (4 Byte, Big Endian), Inhalt.
   --dry          nur lesen und Kennzahlen zeigen, nichts an SRS senden
-  --audio none   den Ton des Handys verwerfen
+  --audio none   den Ton des Handys verwerfen und Stille senden (die Sendekette der Box braucht eine Tonspur, sonst steht sie)
   --audio usb    statt des Handy-Tons das erste USB-Mikrofon (zum Beispiel DJI-Empfänger) aufnehmen, AAC kodieren und mit dem Bild senden;
                  --audio-offset MS verschiebt den Ton gegenüber dem Bild (positiv = später)
   --key/--rtmp-port/--rtmp-app wie mobcam_rtmp.py (nutzt dessen RTMP-Sender)
@@ -91,6 +91,12 @@ def usb_capture_card(asound="/proc/asound"):
     return None
 
 
+def silence_audio_argv():
+    """GStreamer: Stille als AAC-LC mit ADTS-Kopf auf die Standardausgabe (48 kHz, Stereo); für „ohne Ton“, damit die Box eine Tonspur hat."""
+    return ["gst-launch-1.0", "-q", "audiotestsrc", "is-live=true", "wave=silence", "!", "audio/x-raw,rate=48000,channels=2", "!", "voaacenc", "bitrate=64000",
+            "!", "aacparse", "!", "audio/mpeg,mpegversion=4,stream-format=adts", "!", "fdsink", "fd=1"]
+
+
 def usb_audio_argv(device):
     """GStreamer: Mikrofon aufnehmen, als AAC-LC mit ADTS-Kopf auf die Standardausgabe schreiben (48 kHz, Stereo, 128 kbit/s)."""
     if not re.match(r"^plughw:CARD=[A-Za-z0-9_]{1,40}$", device):
@@ -131,9 +137,9 @@ class UsbMic(threading.Thread):
     """Nimmt das USB-Mikrofon auf und gibt jeden AAC-Rahmen mit seiner Ankunftszeit an die Sitzung. Fehlt die Tonkarte oder bricht die
     Aufnahme ab (Empfänger abgezogen), wird alle paar Sekunden neu versucht; das Bild läuft unabhängig davon weiter."""
 
-    def __init__(self, session, asound="/proc/asound", spawn=subprocess.Popen, sleep=time.sleep):
+    def __init__(self, session, asound="/proc/asound", spawn=subprocess.Popen, sleep=time.sleep, silent=False):
         super().__init__(daemon=True)
-        self.s, self.asound, self.spawn, self.sleep = session, asound, spawn, sleep
+        self.s, self.asound, self.spawn, self.sleep, self.silent = session, asound, spawn, sleep, silent
         self.said = None
 
     def note(self, text):
@@ -143,18 +149,18 @@ class UsbMic(threading.Thread):
 
     def run(self):
         while not self.s.closed:
-            dev = usb_capture_card(self.asound)
+            dev = "stille" if self.silent else usb_capture_card(self.asound)
             if dev is None:
                 self.note("info: Kein USB-Mikrofon gefunden (Empfänger anstecken), der Ton fehlt solange")
                 self.sleep(2)
                 continue
             try:
-                proc = self.spawn(usb_audio_argv(dev), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                proc = self.spawn(silence_audio_argv() if self.silent else usb_audio_argv(dev), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             except (OSError, ValueError) as e:
                 self.note("info: Aufnahme des USB-Mikrofons startet nicht: %s" % e)
                 self.sleep(3)
                 continue
-            self.note("info: Ton vom USB-Mikrofon (%s)" % dev)
+            self.note("info: Ohne Ton, die Box bekommt Stille" if self.silent else "info: Ton vom USB-Mikrofon (%s)" % dev)
             buf = b""
             try:
                 while not self.s.closed:
@@ -438,7 +444,7 @@ class Session:
                 getattr(r, name)(*a)
 
     def has_audio(self):
-        return self.args.audio == "usb" or self.cfg["audio"]["ch"] > 0
+        return self.args.audio in ("usb", "none") or self.cfg["audio"]["ch"] > 0
 
     def on_mic_frame(self, raw, asc, rate, t):
         """Ein AAC-Rahmen vom USB-Mikrofon (Aufnahmezeit t auf der Uhr dieser Sitzung). Der Zeitstempel folgt der Zeitachse des Bilds: Zeit des letzten
@@ -708,8 +714,8 @@ def main():
         say("Handy verbunden (USB-Zubehör)")
         s = Session(acc, args)
         threading.Thread(target=_wait_note, args=(s,), daemon=True).start()
-        if args.audio == "usb" and not args.dry:
-            UsbMic(s).start()
+        if args.audio in ("usb", "none") and not args.dry:
+            UsbMic(s, silent=args.audio == "none").start()
         try:
             s.run()
         except (UsbError, OSError, ValueError, KeyError, struct.error, json.JSONDecodeError) as e:
