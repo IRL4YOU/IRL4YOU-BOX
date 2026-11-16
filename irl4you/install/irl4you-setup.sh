@@ -18,7 +18,7 @@ now() { [ "$CHROOT" = 0 ]; }
 step pakete
 need=""
 for p in python3 python3-venv python3-gi python3-dbus python3-bcrypt bluez gstreamer1.0-tools network-manager modemmanager \
-         usb-modeswitch usb-modeswitch-data mobile-broadband-provider-info dnsmasq-base nginx libnginx-mod-stream libssl3t64 openssl iproute2 util-linux; do
+         usb-modeswitch usb-modeswitch-data mobile-broadband-provider-info dnsmasq-base nginx libnginx-mod-stream libssl3t64 openssl iproute2 util-linux iw; do
   dpkg -s "$p" >/dev/null 2>&1 || need="$need $p"
 done
 if [ -n "$need" ]; then
