@@ -326,7 +326,16 @@ document.addEventListener("click", (e) => {
 let wifiData = null,
   wifiTimer = null,
   wifiSig = null;
-const HS_CH = { bg: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], a: [0, 36, 40, 44, 48] };
+const HS_CH = { bg: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], a: [0, 36, 40, 44, 48, 149, 153, 157, 161, 165] },
+  HS_AUTO = { bg: [1, 6, 11], a: [36, 40, 44, 48] };
+function hsChs(c, b) {
+  const k = b === "a" ? "a" : "bg",
+    st = HS_CH[k],
+    ok = c && c.channels && c.channels[k];
+  if (!Array.isArray(ok)) return st;
+  const l = st.filter((n) => n && ok.includes(n));
+  return HS_AUTO[k].every((n) => ok.includes(n)) ? [0, ...l] : l;
+}
 const hsOn0 = (c) => !!(c.hotspot && c.hotspot.running);
 let hsOpen = {},
   hsDraft = {},

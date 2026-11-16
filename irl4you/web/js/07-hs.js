@@ -7,13 +7,15 @@ function hsDefaults(c) {
 }
 function hsPanel(c, busy) {
   const dr = hsDraft[c.iface] || (hsDraft[c.iface] = hsDefaults(c)),
-    chs = HS_CH[dr.band] || HS_CH.bg,
+    chs = hsChs(c, dr.band),
+    ok0 = chs.includes(+dr.ch) || (dr.ch = chs[0] || 0),
     off = busy ? " disabled" : "";
   return `<div class="hspanel" data-iface="${esc(c.iface)}"><div class="wform">
     <label class="muted">Name des Hotspots<input class="hs-ssid" maxlength="32" autocomplete="off" value="${esc(dr.ssid)}"></label>
     <label class="muted">Passwort (8 bis 63 Zeichen)<input class="hs-pw-in" maxlength="63" autocomplete="off" value="${esc(dr.pw)}" placeholder="${c.hotspot ? "leer = gespeichertes Passwort" : ""}"></label>
-    <label class="muted">Band<select class="hs-band"><option value="bg"${dr.band === "bg" ? " selected" : ""}>2,4 GHz (reicht weiter)</option><option value="a"${dr.band === "a" ? " selected" : ""}${c.band5 === false ? " disabled" : ""}>5 GHz (schneller, weniger Störungen)</option></select></label>
+    <label class="muted">Band<select class="hs-band"><option value="bg"${dr.band === "bg" ? " selected" : ""}>2,4 GHz (reicht weiter)</option><option value="a"${dr.band === "a" ? " selected" : ""}${c.band5 === false || !hsChs(c, "a").length ? " disabled" : ""}>5 GHz (schneller, weniger Störungen)</option></select></label>
     <label class="muted">Kanal<select class="hs-ch">${chs.map((n) => `<option value="${n}"${+dr.ch === n ? " selected" : ""}>${n ? `Kanal ${n}` : "automatisch"}</option>`).join("")}</select></label>
+    <div class="ph hs-pow" style="margin:0 0 4px"${dr.band === "a" && +dr.ch >= 149 ? "" : " hidden"}>Hinweis: Auf 5725–5875 MHz (Kanal 149–165) sind in Deutschland höchstens 25 mW Sendeleistung (EIRP) erlaubt. Viele Karten senden hier stärker. Für die Einhaltung ist der Betreiber verantwortlich.<label style="display:block;margin-top:4px"><input type="checkbox" class="hs-ack"${dr.ack ? " checked" : ""}> Ich habe das verstanden und verantworte die Nutzung.</label></div>
   </div><div class="actions"><button type="button" class="hs-save"${off}>Speichern</button> <button type="button" class="sec hs-gen">Passwort erzeugen</button> <button type="button" class="sec hs-close">Schließen</button></div></div>`;
 }
 function hsControls(c, busy) {
@@ -99,6 +101,7 @@ async function hsSave(iface) {
         password: dr.pw || "",
         band: dr.band,
         channel: parseInt(dr.ch, 10) || 0,
+        power_ack: dr.band === "a" && +dr.ch >= 149 && !!dr.ack,
       },
       "Speichere die Einstellungen …",
     )
@@ -168,12 +171,15 @@ $("hsdev").addEventListener("input", (e) => {
   else if (c.contains("hs-band")) {
     dr.band = e.target.value;
     const sel = card.querySelector(".hs-ch"),
-      chs = HS_CH[dr.band] || HS_CH.bg;
-    if (!chs.includes(+dr.ch)) dr.ch = 0;
+      chs = hsChs(hsCard(card.dataset.iface) || {}, dr.band);
+    if (!chs.includes(+dr.ch)) dr.ch = chs[0] || 0;
     sel.innerHTML = chs
       .map((n) => `<option value="${n}"${+dr.ch === n ? " selected" : ""}>${n ? `Kanal ${n}` : "automatisch"}</option>`)
       .join("");
   } else if (c.contains("hs-ch")) dr.ch = parseInt(e.target.value, 10) || 0;
+  else if (c.contains("hs-ack")) dr.ack = e.target.checked;
+  const pw = card.querySelector(".hs-pow");
+  if (pw) pw.hidden = !(dr.band === "a" && +dr.ch >= 149);
 });
 const FREE_ID = "5";
 let posFree = { 1: { x: 500, y: 500 }, 2: { x: 500, y: 500 }, 3: { x: 500, y: 500 } };
