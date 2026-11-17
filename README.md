@@ -30,7 +30,7 @@ Läuft auf Ubuntu 26.04 mit Rockchip-Kernel 6.1.
 - **Oberfläche** im Browser (`irl4you/`): Senden, Kameras, Netzwerk, Vorschau, Twitch-Chat, Logs, Updates; 13 Sprachen.
 - **Eingänge**: RTMP/SRT (SRS 6), HDMI, USB-Kameras, DJI-Kameras per Bluetooth, Handys.
 - **IRL4YOU Cam** (Android-Handy per USB-Kabel als Kamera): Bild und Ton gehen unverändert durch. Steht das Handy hochkant, stellt die Box das Bild automatisch ein: als kleines Bild in voller Höhe links, in der Mitte oder rechts, als Hauptbild links oder rechts, und die zweite Kamera füllt den restlichen Platz. Das gilt nur für die IRL4YOU Cam.
-- <img src="bilder/logo-link.png" width="22" alt=""> **IRL4YOU Stream Link** (zweites Android-Handy als weiterer Sendeweg): Die App erweitert das Netz der Box über ein zweites Handy und ist für diese Box gemacht. [App herunterladen](https://github.com/IRL4YOU/IRL4YOU-Cam/releases/latest) · [Beschreibung](https://github.com/IRL4YOU/IRL4YOU-Cam). In der Box unter Netzwerk > Stream Link.
+- <img src="bilder/logo-link.png" width="22" alt=""> **IRL4YOU Stream Link** (Android-Handys als weitere Sendewege, bis zu 8): Die App erweitert das Netz der Box über Handys mit eigenem Mobilfunk und ist für diese Box gemacht. [App herunterladen](https://github.com/IRL4YOU/IRL4YOU-Cam/releases/latest) · [Beschreibung](https://github.com/IRL4YOU/IRL4YOU-Cam). In der Box unter Netzwerk > Stream Link.
 - **Encoder und SRTLA-Sender** (`encoder/`, `srtla/`): eigene Entwicklung, bündelt mehrere Leitungen zu einer Sendung.
 - **Updater** (`updater/`): `irl4you-update` holt die Commits von `main`; er wartet, solange gesendet wird.
 - **Releases:** [docs/RELEASE.md](docs/RELEASE.md).
@@ -83,7 +83,7 @@ Runs on Ubuntu 26.04 with the Rockchip 6.1 kernel.
 - **Web interface** (`irl4you/`): streaming, cameras, network, preview, Twitch chat, logs, updates; 13 languages.
 - **Inputs**: RTMP/SRT (SRS 6), HDMI, USB cameras, DJI cameras over Bluetooth, phones.
 - **IRL4YOU Cam** (Android phone as a camera over a USB cable): picture and sound pass through unchanged. When the phone is held upright, the box adjusts the picture automatically: as a small picture at full height on the left, in the middle or on the right, or as the main picture on the left or right, with the second camera filling the remaining space. This applies to the IRL4YOU Cam only.
-- <img src="bilder/logo-link.png" width="22" alt=""> **IRL4YOU Stream Link** (a second Android phone as an additional uplink): the app extends the box's network over a second phone and is made for this box. [Download the app](https://github.com/IRL4YOU/IRL4YOU-Cam/releases/latest) · [Description](https://github.com/IRL4YOU/IRL4YOU-Cam). In the box under Network > Stream Link.
+- <img src="bilder/logo-link.png" width="22" alt=""> **IRL4YOU Stream Link** (Android phones as additional uplinks, up to 8): the app extends the box's network over phones with their own mobile data and is made for this box. [Download the app](https://github.com/IRL4YOU/IRL4YOU-Cam/releases/latest) · [Description](https://github.com/IRL4YOU/IRL4YOU-Cam). In the box under Network > Stream Link.
 - **Encoder and SRTLA sender** (`encoder/`, `srtla/`): own development, bonds several links into one stream.
 - **Updater** (`updater/`): `irl4you-update` fetches the commits of `main`; it waits while a stream is running.
 - **Releases:** [docs/RELEASE.md](docs/RELEASE.md).
