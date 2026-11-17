@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_irl4you import irl, load_script  # noqa: E402  (liefert auch die Linux-Ersatzmodule für Windows)
 
 H = load_script("pipbox-wifi.py", "pipbox_wifi_kanaele")
+D = load_script("dji_daemon.py", "dji_daemon_kanaele")
 W = irl("webui.wifi").Wifi
 
 INTEL = """
@@ -218,6 +219,18 @@ class ServerChecks(unittest.TestCase):
             except Exception as e:  # Umgebung ohne nmcli/dji-Geräte: nur die Kanalliste ist hier wichtig
                 self.skipTest(str(e))
         self.assertEqual(cards[0]["channels"], INTEL_CH)
+
+
+class KameraVerbindung(unittest.TestCase):
+    def test_p2p_schnittstelle_ist_nie_die_verbindung_zur_kamera(self):
+        d = tempfile.mkdtemp()
+        for n, mac in (("p2p0", "02:00:00:00:00:0b"), ("wlan0", "02:00:00:00:00:0b"), ("wlan1", "02:00:00:00:00:0a")):
+            os.makedirs(os.path.join(d, n))
+            with open(os.path.join(d, n, "address"), "w") as f:
+                f.write(mac + "\n")
+        self.assertEqual(D.iface_by_mac("02:00:00:00:00:0b", d), "wlan0", "p2p0 kommt alphabetisch zuerst, hat aber dieselbe MAC wie wlan0")
+        self.assertEqual(D.iface_by_mac("02:00:00:00:00:0a", d), "wlan1")
+        self.assertIsNone(D.iface_by_mac("02:00:00:00:00:99", d))
 
 
 if __name__ == "__main__":
