@@ -374,6 +374,7 @@
         return row({ icon: o.iface.startsWith('wlan') ? 'wifi' : 'ethernet', title: (sr.conn_names || {})[o.iface] ? `${o.label} (${sr.conn_names[o.iface]})` : o.label,
           desc: d ? d.text : `${fmt((net[o.iface] || {}).tx_mbit)} Mbit/s hoch · ${fmt((net[o.iface] || {}).rx_mbit)} Mbit/s runter`, end: badge(d && d.level !== 'bad' ? 'Prüfen' : label, tone) });
       });
+      if (Neu.linkRows) rows.push(...Neu.linkRows({ speed: false }));      // Stream Link: Handys als kleine Zeilen (Name, Verbunden, Akku, MB)
       setLive(linesBody, rows.length ? list(rows) : h('div', { class: 'empty' }, h('span', { text: 'Keine Leitung zum Senden gewählt.' }), h('a', { class: 'btn', href: '#netz', data: { size: 'sm', viewLink: 'netz' }, text: 'Leitungen wählen' })));
     }
 
@@ -416,7 +417,7 @@
       alerts.hidden = !alerts.children.length;
     }
 
-    App.on('rotation', renderLiveCtl); App.on('send', () => { renderHero(); renderLiveCtl(); }); App.on('srtla', () => { renderHero(); renderKpi(); renderLines(); });
+    App.on('rotation', renderLiveCtl); App.on('send', () => { renderHero(); renderLiveCtl(); }); App.on('srtla', () => { renderHero(); renderKpi(); renderLines(); }); App.on('link', renderLines);
     App.on('metrics', () => { renderKpi(); renderLines(); renderCams(); renderAlerts(); renderHero(); renderDet(); });
     App.data['send:refresh'] = poll('send', '/api/send', 2000);
     App.data['metrics:refresh'] = poll('metrics', '/api/metrics', 2000);

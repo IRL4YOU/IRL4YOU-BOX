@@ -1,4 +1,4 @@
-/* Ansicht „Netzwerk“: Leitungen (wählen, testen), Server und Bitrate, Stream Link (zweites Handy), Fernzugriff. WLAN, Bluetooth und feste Adresse bleiben in der bisherigen Oberfläche. */
+/* Ansicht „Netzwerk“: Leitungen (wählen, testen), Server und Bitrate, Stream Link (Handys als zusätzliche Sendewege), Fernzugriff. WLAN, Bluetooth und feste Adresse bleiben in der bisherigen Oberfläche. */
 (() => {
   'use strict';
   const { h, ico, fmt, api, App, poll, ask, sheet, closeSheet, toast, run, badge, btn, alertBox, card, row, list, sw, field, input, select, seg, range, disclosure, pageHead, view } = Neu;
@@ -17,59 +17,41 @@
     T.add('n1', 'Leitungen', leitungen); T.add('n2', 'Server und Bitrate', server); T.add('n-link', 'Stream Link', h('div', { class: 'stack' }, linkHost));
     const subP = h('p', { id: 'net-sub' }); sec.querySelector('.page-head > div').append(subP);
 
-    /* ================= Stream Link (zweites Handy, App „IRL4YOU Stream Link“) ================= */
-    const linkRefresh = poll('link', '/api/link', 4000, () => App.view === 'netz');
+    /* ================= Stream Link (Handys als zusätzliche Sendewege, App „IRL4YOU Stream Link“) ================= */
+    const linkRefresh = Neu.linkRefresh;       // Abfrage und Zeilen kommen aus link.js (auch für die Live-Seite)
     const linkPost = async body => { try { App.set('link', await api('POST', '/api/link', body)); } catch (x) { toast(x.message); linkRefresh(); } };
-    const LINK_ERR = { password: 'Das Passwort stimmt nicht mit dem in der App überein.', no_mobile: 'Das zweite Handy hat gerade kein Mobilfunknetz.', target: 'Das zweite Handy erreicht den Server nicht.', busy: 'Das zweite Handy ist belegt.', other: 'Das zweite Handy hat die Anmeldung abgelehnt.' };
+    const LINK_ERR = { password: 'Das Passwort stimmt nicht mit dem in der App überein.', no_mobile: 'Das Handy hat gerade kein Mobilfunknetz.', target: 'Das Handy erreicht den Server nicht.', busy: 'Das Handy ist belegt.', other: 'Das Handy hat die Anmeldung abgelehnt.' };
     function renderLink() {
       const d = App.data.link; if (!d) return;
       const sg = JSON.stringify(d); if (sg === linkSig && linkHost.firstChild) return;
       if (linkHost.contains(document.activeElement) && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') return;
       linkSig = sg;
-      const kids = [linkLinks(), sw({ checked: !!d.enabled, label: 'Zweites Handy als zusätzlichen Sendeweg nutzen', s: 'Stream Link', k: 'stream link cam link zweites handy mobilfunk sendeweg', onchange: on => linkPost({ enabled: on }) })];
+      const kids = [linkLinks(), sw({ checked: !!d.enabled, label: 'Handys als zusätzliche Sendewege nutzen', s: 'Stream Link', k: 'stream link cam link handy handys mobilfunk sendeweg', onchange: on => linkPost({ enabled: on }) })];
       if (d.enabled && !d.service) kids.push(alertBox({ tone: 'warn', text: 'Der Stream-Link-Dienst läuft nicht. Spiele das Software-Update ein oder starte die Box neu.' }));
       if (d.enabled && d.service && !d.target) kids.push(alertBox({ tone: 'warn', text: 'Wähle zuerst einen SRTLA-Server.' }));
       if (d.enabled) {
         const ifs = (d.interfaces || []).map(o => [o.iface, o.label]);
         kids.push(field({ label: 'Passwort (wie in der App)', control: input({ value: d.password || '', maxLength: 64, autocomplete: 'off', onchange: e => linkPost({ password: e.target.value }) }) }),
-          field({ label: 'Netzwerkkarte, an der das zweite Handy hängt', control: select([['', 'Alle'], ...ifs], d.iface || '', v => linkPost({ iface: v })) }));
+          field({ label: 'Netzwerkkarte, an der die Handys hängen', control: select([['', 'Alle'], ...ifs], d.iface || '', v => linkPost({ iface: v })) }));
         const hs = d.helpers || [];
-        if (!hs.length) kids.push(d.searching ? badge('Suche nach dem zweiten Handy …', null, true) : null);
+        if (!hs.length) kids.push(d.searching ? badge('Suche nach Handys …', null, true) : null);
         for (const x of hs) {
-          if (x.state === 'up') kids.push(h('div', { class: 'cluster' }, badge('Verbunden', 'ok'), x.battery != null ? h('span', { class: 'num', text: `Akku ${x.battery} %` }) : null, x.mobile === false ? badge('Kein Mobilfunk', 'warn') : null, h('span', { class: 'num', text: `${fmt(x.mb_up)} MB hoch` })));
+          if (x.state === 'up') kids.push(h('div', { class: 'cluster' }, badge('Verbunden', 'ok'), Neu.linkBatt(x, 'num'), x.mobile === false ? badge('Kein Mobilfunk', 'warn') : null, h('span', { class: 'num', text: `${fmt(x.mb_up)} MB hoch` })));
           else if (x.state === 'error') kids.push(alertBox({ tone: 'warn', text: LINK_ERR[x.error] || LINK_ERR.other }));
           else kids.push(badge('Verbinde …', null, true));
         }
       }
       kids.push(disclosure('Wie funktioniert das?', h('div', { class: 'stack', style: '--gap:var(--space-2)' },
-        h('p', { class: 'muted', style: 'font-size:var(--text-sm)' }, 'Ein zweites Handy mit der App „IRL4YOU Stream Link“ schickt einen Teil der Daten über sein eigenes Mobilfunknetz. Es muss im selben Netz wie die Box hängen, zum Beispiel am Router. Gib in der App dasselbe Passwort ein und lass sie laufen, die Box findet das Handy selbst.'),
-        h('p', { class: 'muted', style: 'font-size:var(--text-sm)' }, 'Die App „IRL4YOU Stream Link“ erweitert das Netz der Box über ein zweites Handy und ist für diese Box gemacht.'),
+        h('p', { class: 'muted', style: 'font-size:var(--text-sm)' }, 'Ein Handy mit der App „IRL4YOU Stream Link“ schickt einen Teil der Daten über sein eigenes Mobilfunknetz. Es muss im selben Netz wie die Box hängen, zum Beispiel am Router. Gib in der App dasselbe Passwort ein und lass sie laufen, die Box findet das Handy selbst. Es können mehrere Handys gleichzeitig mitsenden.'),
+        h('p', { class: 'muted', style: 'font-size:var(--text-sm)' }, 'Die App „IRL4YOU Stream Link“ erweitert das Netz der Box über Handys mit eigenem Mobilfunk und ist für diese Box gemacht.'),
         )));
       linkHost.replaceChildren(card({ title: 'Stream Link', logo: linkLogo(40), body: kids.filter(Boolean) }));
     }
 
-    /* Zweite Handys als Zeilen unter „Leitungen“: Hochladen und Herunterladen je Handy, aus den Zählern des Link-Dienstes (alle paar Sekunden abgefragt) */
-    const lSamp = {}, lRate = {}; let lObj = null;
-    function linkRates(hs) {
-      if (App.data.link === lObj) return; lObj = App.data.link; const now = Date.now();
-      for (const x of hs) {
-        const p = lSamp[x.id]; lSamp[x.id] = { t: now, up: x.mb_up, down: x.mb_down };
-        if (!p || now - p.t < 500 || x.mb_up == null) continue;
-        const dt = (now - p.t) / 1000;
-        lRate[x.id] = { up: Math.max(0, (x.mb_up - p.up) * 8 / dt), down: Math.max(0, (x.mb_down - p.down) * 8 / dt) };
-      }
-    }
+    /* Handys als Zeilen unter „Leitungen“ (Karte „Stream Link“): Name zum Ändern, Hoch und Runter, Akku mit Blitz, gesendete MB */
     function renderLinkLines() {
-      const d = App.data.link, hs = d && d.enabled ? (d.helpers || []).filter(x => x.state === 'up') : [];
-      if (!hs.length) { linkLines.replaceChildren(); return; }
-      linkRates(hs);
-      const rows = hs.map((x, i) => {
-        const r = lRate[x.id], rate = r ? `${fmt(r.up)} Mbit/s hoch · ${fmt(r.down)} Mbit/s runter` : '– Mbit/s hoch · – Mbit/s runter';
-        const bits = [x.ip ? h('span', { class: 'muted', text: x.ip }) : null, x.battery != null ? h('span', { class: 'muted', text: `Akku ${x.battery} %` }) : null, x.mobile === false ? h('span', { class: 'muted', text: 'Kein Mobilfunk' }) : null, h('span', { class: 'muted', text: `${fmt(x.mb_up)} MB hoch` })].filter(Boolean);
-        const info = h('span', { class: 'cluster', style: '--gap:var(--space-2)' }, ...bits.flatMap((b, k) => k ? [h('span', { class: 'muted', 'aria-hidden': 'true', text: '·' }), b] : [b]));
-        return row({ icon: 'wifi', title: hs.length > 1 ? `Zweites Handy ${i + 1}` : 'Zweites Handy', desc: h('span', null, h('span', { class: 'num', text: rate }), h('br'), info),
-          end: badge('Verbunden', 'ok') });
-      });
+      const rows = Neu.linkRows({ edit: true, ip: true, speed: true });
+      if (!rows.length) { linkLines.replaceChildren(); return; }
       linkLines.replaceChildren(card({ title: 'Stream Link', logo: linkLogo(32), foot: [linkLinks()], sub: 'Werden als zusätzliche Leitung genutzt, solange sie verbunden sind. Einstellungen im Reiter „Stream Link“.', body: list(rows), flush: true }));
     }
 
