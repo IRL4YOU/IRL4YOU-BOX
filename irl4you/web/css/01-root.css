@@ -46,7 +46,8 @@ h1.hl {
   display: inline-flex;
   align-items: center;
 }
-.hl .hlogo svg {
+.hl .hlogo svg,
+.hl .hlogo img {
   display: block;
   height: 26px;
   width: 26px;
