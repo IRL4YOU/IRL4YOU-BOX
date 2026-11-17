@@ -299,6 +299,20 @@ def uplink_ips(uplinks, wait=UPLINK_WAIT_S, sleep=time.sleep, clock=time.monoton
         sleep(1)
 
 
+LINK_FILE = "/run/pipbox-link/links"
+LINK_RX = re.compile(r"^\d{1,3}(\.\d{1,3}){3} via \d{1,3}(\.\d{1,3}){3}:\d{1,5}$")
+
+
+def link_lines(path=None):
+    """Zusätzliche Sendewege über Hilfshandys (Dienst pipbox-link): Zeilen "<Adresse der Box> via <Hilfshandy>:<Datenport>"."""
+    try:
+        with open(path or LINK_FILE) as f:
+            rows = f.read().splitlines()
+    except OSError:
+        return []
+    return [r for r in rows if LINK_RX.match(r)][:3]
+
+
 def prepare():
     srt = load_json(f"{STATE}/srtla.json")
     pipe = load_json(f"{STATE}/pipeline.json")
@@ -354,6 +368,7 @@ def prepare():
         raise Refuse("Der Bildaufbau konnte nicht erzeugt werden (Kamera-Schlüssel ungültig)")
     with open(f"{WORK}/bitrate", "w") as f:
         f.write(f"{mn} {mx}\n")
+    ips = ips + link_lines()
     with open(f"{WORK}/ips", "w") as f:
         f.write("\n".join(ips) + "\n")
     return sv, lat, mn, mx, ips, {"cfg": cfg, "layout": used, "auto": auto, "always": always, "always_note": note,
@@ -959,7 +974,10 @@ class Sender:
         ups = [u for u in st.get("uplinks", []) if isinstance(u, str)]
         have = {o["iface"]: o["ip"] for o in server.iface_ips()}
         ips = [have[u] for u in ups if u in have]
-        if not ips or ips == self.ips:
+        if not ips:
+            return False
+        ips = ips + link_lines()
+        if ips == self.ips:
             return False
         self.ips = ips
         with open(f"{WORK}/ips", "w") as f:

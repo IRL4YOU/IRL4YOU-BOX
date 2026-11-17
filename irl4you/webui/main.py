@@ -28,6 +28,7 @@ from .handler import Handler
 from .hubproxy import HubStore, make_server as make_hub_server
 from .httpserver import LimitedHTTPServer
 from .layout import DeckStore, LayoutStore
+from .link import LinkStore
 from .netstate import IfaceMemory, NetChoice, SrtlaStore
 from .pipeline import PipelineStore
 from .remote import Remote
@@ -157,6 +158,7 @@ def main():
     Handler.previewaccess = PreviewAccess(os.path.join(args.state, "preview-access.json"), demo=args.demo)
     Handler.netaddr = ExtraAddress(args.state, demo=args.demo)
     Handler.modems = pipbox_modem.Modems(args.state, demo=args.demo)
+    Handler.link = LinkStore(args.state, demo=args.demo)
     LimitedHTTPServer.ui_access = Handler.uiaccess
     LimitedHTTPServer.allow_public = args.allow_public
     srv = LimitedHTTPServer((args.host, args.port), Handler)

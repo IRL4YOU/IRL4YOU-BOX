@@ -27,6 +27,7 @@ class Handler(HttpBase, HttpStats, GetRoutes, PostRoutes):
     statsserver = None
     fpsprobe = None
     uplinktest = None
+    link = None
 
     @classmethod
     def hotspot_ifaces(cls):

@@ -80,6 +80,8 @@ typedef struct {
     int slot_state;           /* L_FREE = unused slot */
     char ip[INET_ADDRSTRLEN];
     char dev[IF_NAMESIZE];
+    char via[64];             /* "IP:PORT" of a relay (helper phone) instead of the receiver, empty = direct */
+    struct sockaddr_in via_addr;
     bool seen;                /* reload mark */
     int fd;
     int64_t t_open_try, t_join_tx, t_rx, t_probe;
@@ -187,6 +189,10 @@ static void event(const char *ev, const link_t *l, const char *fmt, ...)
     if (l) {
         printf(",\"ip\":");
         json_str(stdout, l->ip);
+        if (l->via[0]) {
+            printf(",\"via\":");
+            json_str(stdout, l->via);
+        }
     }
     if (fmt) {
         char msg[512];
@@ -228,6 +234,10 @@ static void write_stats(FILE *f)
         json_str(f, l->ip);
         fprintf(f, ",\"dev\":");
         json_str(f, l->dev);
+        if (l->via[0]) {
+            fprintf(f, ",\"via\":");
+            json_str(f, l->via);
+        }
         fprintf(f, ",\"state\":\"%s\"", link_state_name(l));
         if (l->have_rtt)
             fprintf(f, ",\"rtt_ms\":%.1f,\"jitter_ms\":%.1f", l->srtt, l->jitter);
@@ -328,7 +338,7 @@ static void link_open(link_t *l, int64_t now)
         event("warn", l, "an Karte %s binden fehlgeschlagen: %s", l->dev, strerror(errno));
     struct sockaddr_in src = {.sin_family = AF_INET};
     if (inet_pton(AF_INET, l->ip, &src.sin_addr) != 1 || bind(fd, (struct sockaddr *)&src, sizeof src) != 0 ||
-        connect(fd, (struct sockaddr *)&S.server, sizeof S.server) != 0) {
+        connect(fd, (struct sockaddr *)(l->via[0] ? &l->via_addr : &S.server), sizeof S.server) != 0) {
         int e = errno ? errno : EINVAL;
         if (l->last_errno != e)
             event("link_error", l, "%s", strerror(e));
@@ -825,17 +835,44 @@ static void load_links(int64_t now)
         char *hash = strchr(line, '#');
         if (hash)
             *hash = 0;
-        char ip[64] = "", dev[64] = "";
-        if (sscanf(line, "%63s %63s", ip, dev) < 1)
+        /* IP [Karte] [via IP:PORT] */
+        char tok[4][64] = {"", "", "", ""};
+        int nt = sscanf(line, "%63s %63s %63s %63s", tok[0], tok[1], tok[2], tok[3]);
+        if (nt < 1)
             continue;
+        const char *ip = tok[0];
+        char dev[64] = "", via[64] = "";
+        int ti = 1;
+        if (nt > ti && strcmp(tok[ti], "via") != 0)
+            copy_str(dev, sizeof dev, tok[ti++]);
+        bool bad = false;
+        struct sockaddr_in via_addr = {.sin_family = AF_INET};
+        if (nt > ti && strcmp(tok[ti], "via") == 0) {
+            char host[64];
+            int vport = 0;
+            char *colon = nt > ti + 1 ? strrchr(tok[ti + 1], ':') : NULL;
+            if (!colon || (size_t)(colon - tok[ti + 1]) >= sizeof host) {
+                bad = true;
+            } else {
+                memcpy(host, tok[ti + 1], (size_t)(colon - tok[ti + 1]));
+                host[colon - tok[ti + 1]] = 0;
+                vport = atoi(colon + 1);
+                if (inet_pton(AF_INET, host, &via_addr.sin_addr) != 1 || vport < 1 || vport > 65535)
+                    bad = true;
+                via_addr.sin_port = htons((uint16_t)vport);
+                copy_str(via, sizeof via, tok[ti + 1]);
+            }
+        } else if (nt > ti) {
+            bad = true;
+        }
         struct in_addr tmp;
-        if (inet_pton(AF_INET, ip, &tmp) != 1 || strlen(dev) >= IF_NAMESIZE) {
+        if (bad || inet_pton(AF_INET, ip, &tmp) != 1 || strlen(dev) >= IF_NAMESIZE) {
             event("warn", NULL, "Zeile in der Leitungsliste ignoriert: %s", ip);
             continue;
         }
         link_t *l = NULL;
         for (int i = 0; i < MAX_LINKS && !l; i++)
-            if (S.links[i].slot_state != L_FREE && strcmp(S.links[i].ip, ip) == 0)
+            if (S.links[i].slot_state != L_FREE && strcmp(S.links[i].ip, ip) == 0 && strcmp(S.links[i].via, via) == 0)
                 l = &S.links[i];
         if (l && strcmp(l->dev, dev) != 0) {
             link_down(l, "Karte geändert");
@@ -855,6 +892,8 @@ static void load_links(int64_t now)
             l->slot_state = L_CLOSED;
             copy_str(l->ip, sizeof l->ip, ip);
             copy_str(l->dev, sizeof l->dev, dev);
+            copy_str(l->via, sizeof l->via, via);
+            l->via_addr = via_addr;
             link_reset_path(l);
             link_open(l, now);
         }

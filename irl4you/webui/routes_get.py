@@ -66,6 +66,8 @@ class GetRoutes:
             return self.send_bytes(200, body.encode(), "application/javascript; charset=utf-8")
         if path == "/api/modems":
             return self.reply(200, self.modems.status())
+        if path == "/api/link":
+            return self.reply(200, self.link.status())
         if path in ("/chat.js", "/chat.css"):
             body = read(os.path.join(WEB_DIR, path[1:]), "")
             return self.send_bytes(200, body.encode(), "application/javascript; charset=utf-8" if path.endswith(".js") else "text/css; charset=utf-8")

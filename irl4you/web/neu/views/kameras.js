@@ -157,7 +157,8 @@
     /* ---------- Anzeige der Quellen ---------- */
     function render() {
       const m = App.data.metrics || {}, djs = (App.data.dji && App.data.dji.cameras) || [];
-      const cams = (m.cameras || []).filter(c => c.key !== 'hdmi');
+      const hd = App.data.hdmi, hdmiOn = !!(hd && hd.settings && hd.settings.enabled);      // die Kamera „HDMI/USB/Testbild“ (Schlüssel hdmi) steht nur da, solange „Als Kamera senden“ an ist
+      const cams = (m.cameras || []).filter(c => c.key !== 'hdmi' || hdmiOn);
       const sg = JSON.stringify([cams.map(c => [c.id, c.name, c.role, c.state, c.parked, c.iface, c.url, c.via, c.in_pips, c.is_main, c.auto, (c.key || '').startsWith('dji-') ? null : c.battery != null]), djs.map(d => [d.addr, d.state, d.battery != null, d.charging, d.detail, d.wifi_ifname, d.switch_wait > 0, d.publishing, d.saved, d.ssid, d.autoconnect, d.battery_age > 600, !!d.retry_in, d.in_range]), netOpts().map(o => o.iface), App.data.dji && App.data.dji.wifi_options]);
       const n = cams.length, live = cams.filter(c => c.state === 'live').length;
       const subT = `${n} ${n === 1 ? 'Quelle' : 'Quellen'} · ${live} senden gerade`; if (subP.textContent !== subT) subP.textContent = subT;
@@ -166,7 +167,7 @@
       if (grid.contains(document.activeElement) && document.activeElement.tagName !== 'BUTTON') return; sig = sg;
       grid.replaceChildren(...(cams.length ? cams.map((c, i) => camCard(c, i, cams)) : [h('div', { class: 'empty card', style: 'grid-column:1/-1' }, h('b', null, 'Noch keine Kamera'), h('span', null, 'Lege ein Handy oder eine Kamera an, um zu starten.'), btn('Kamera hinzufügen', { variant: 'primary', onclick: () => Neu.goto('kameras', 'k-neu') }))]));
     }
-    App.on('metrics', render); App.on('dji', render); App.on('network', () => { renderNet(); render(); });
+    App.on('metrics', render); App.on('dji', render); App.on('hdmi', render); App.on('network', () => { renderNet(); render(); });
 
     /* ---------- Reiter: Quellen ---------- */
     T.add('k-quellen', 'Quellen', h('div', { class: 'stack', style: '--gap:var(--space-5)' }, grid, netBox));
