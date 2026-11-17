@@ -48,6 +48,12 @@ class TestFavicon(unittest.TestCase):
         for p in ("/logo-box.svg", "/logo-link.svg"):
             self.assertIn('"%s"' % p, r)
 
+    def test_ampel_in_der_kopfzeile_kommt_aus_den_meldungen(self):
+        boot = _read(os.path.join(WEB, "neu", "boot.js"))
+        self.assertIn("m.light || lightOf(m)", boot, "ohne Feld light der Box baut die Kopfzeile die Ampel aus den Meldungen")
+        self.assertIn("function lightOf(m)", boot)
+        self.assertIn("Neu.alertInfo", _read(os.path.join(WEB, "neu", "views", "live.js")))
+
     def test_logos_sind_vorhanden(self):
         for f in ("favicon.svg", "logo-link.svg"):
             svg = _read(os.path.join(WEB, "icons", f))
