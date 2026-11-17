@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""pipbox-link: ein zweites Handy (App "IRL4YOU Stream Link") als zusätzlicher Sendeweg.
+"""pipbox-link: Handys (App "IRL4YOU Stream Link") als zusätzliche Sendewege (bis zu 8).
 
 Das Hilfshandy hängt im selben Netz (Router) wie die Box und reicht UDP über seinen eigenen Mobilfunk an den SRTLA-Server weiter.
 Dieser Dienst sucht es (HELLO als Rundruf), meldet die Box an (CHALLENGE -> OPEN -> OK), hält die Sitzung mit PING offen und trägt die
@@ -40,7 +40,7 @@ OPEN_TIMEOUT_S = 5.0
 RETRY_AFTER_ERR_S = 10.0
 HELLO_SEARCH_S = 3.0        # ohne Hilfshandy auf der Karte so oft suchen
 HELLO_IDLE_S = 20.0         # mit Hilfshandy seltener (weitere Hilfshandys finden)
-MAX_HELPERS = 3
+MAX_HELPERS = 8
 CONF_EVERY_S = 2.0
 IFACE_EVERY_S = 5.0
 SKIP_PREFIX = ("lo", "docker", "veth", "br-", "virbr", "p2p", "tailscale", "tun", "tap", "wg", "zt")
