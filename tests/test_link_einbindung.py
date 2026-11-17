@@ -86,9 +86,9 @@ class TestLinkLines(unittest.TestCase):
         self.write("192.168.1.20 via 192.168.1.50:45678\nquatsch\n1.2.3.4 via host:5\n; rm -rf /\n1.2.3.4 via 5.6.7.8\n")
         self.assertEqual(self.ps.link_lines(self.f), ["192.168.1.20 via 192.168.1.50:45678"])
 
-    def test_hoechstens_drei(self):
-        self.write("".join(f"10.0.0.1 via 10.0.0.{i}:4000\n" for i in range(2, 9)))
-        self.assertEqual(len(self.ps.link_lines(self.f)), 3)
+    def test_hoechstens_acht(self):
+        self.write("".join(f"10.0.0.1 via 10.0.0.{i}:4000\n" for i in range(2, 14)))
+        self.assertEqual(len(self.ps.link_lines(self.f)), 8)
 
 
 if __name__ == "__main__":
