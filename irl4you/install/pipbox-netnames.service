@@ -1,0 +1,20 @@
+[Unit]
+Description=IRL4YOU BOX feste LAN- und WLAN-Namen (einmal beim Start, vor dem Netzwerk, nie im Betrieb)
+DefaultDependencies=no
+Wants=systemd-udev-settle.service
+After=systemd-udevd.service systemd-udev-trigger.service systemd-udev-settle.service
+Before=network-pre.target NetworkManager.service
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/pipbox/pipbox-netnames.py --boot
+TimeoutStartSec=45
+# der Start darf daran nie scheitern
+SuccessExitStatus=1 2
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

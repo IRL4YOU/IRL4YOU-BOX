@@ -83,11 +83,7 @@ python3 "$OPT/pipbox-netaddr.py" --refresh || true
 # Feste Kartennamen nach MAC: nur Dateien schreiben (/etc/pipbox/netnames.json, /etc/systemd/network/10-irl4you-*.link). Sie gelten beim nächsten Start.
 # NIE im laufenden Betrieb umbenennen: das trennt die Karte, DHCP bricht ab und die Box ist nicht mehr erreichbar.
 if now; then python3 "$OPT/pipbox-netnames.py" || true; fi      # im chroot nicht: dort sind es die Karten des Bau-Rechners
-# Reste der ersten Fassung (Dienst, der im Betrieb umbenannte) entfernen
-if [ -e /etc/systemd/system/pipbox-netnames.service ]; then
-  systemctl disable pipbox-netnames.service 2>/dev/null || true
-  rm -f /etc/systemd/system/pipbox-netnames.service /etc/systemd/system/sysinit.target.wants/pipbox-netnames.service
-fi
+# Der Dienst pipbox-netnames.service (nur beim Start, vor dem Netzwerk) tauscht vertauschte Namen sicher zurück; er wird eingeschaltet, hier aber nie gestartet.
 # ifupdown und ifplugd übernehmen die LAN-Karten nicht mehr (nur ausschalten, nicht jetzt anhalten: sonst könnte die Verbindung abreißen)
 for u in ifplugd.service networking.service; do
   systemctl disable "$u" 2>/dev/null || true
@@ -146,7 +142,7 @@ done
 rm -f /etc/systemd/system/pipbox-swupdate.service /etc/systemd/system/pipbox-swupdate.path /etc/systemd/system/pipbox-update.service /etc/systemd/system/pipbox-update.path
 mkdir -p /etc/systemd/system/tailscaled.service.d
 [ -f "$HERE/install/tailscaled-pipbox-order.conf" ] && install -m 644 "$HERE/install/tailscaled-pipbox-order.conf" /etc/systemd/system/tailscaled.service.d/pipbox-order.conf
-UNITS="pipbox.service pipbox-dji.service pipbox-hdmi.service pipbox-health.service pipbox-arp.service pipbox-link.service
+UNITS="pipbox.service pipbox-dji.service pipbox-hdmi.service pipbox-health.service pipbox-arp.service pipbox-link.service pipbox-netnames.service
   pipbox-send-ctl.path pipbox-remote.path pipbox-remote-heal.timer pipbox-wifi.path
   pipbox-power.path pipbox-logmode.path pipbox-netaddr.path pipbox-logs.path pipbox-ssh.path pipbox-btdriver.timer pipbox-btdriver.path
   pipbox-wlandriver.timer pipbox-btchip.path pipbox-btchip.service pipbox-logrotate.timer pipbox-preview.socket
