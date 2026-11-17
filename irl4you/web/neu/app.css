@@ -4,7 +4,7 @@
   .app { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); min-height: 100dvh; }
   .side { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-4); background: var(--surface-1); border-right: 1px solid var(--border); }
   .brand { display: flex; align-items: center; gap: var(--space-3); font-weight: var(--weight-bold); font-size: var(--text-lg); padding: var(--space-1) var(--space-2); color: var(--text-1); text-decoration: none; }
-  .brand svg { width: 2rem; height: 2rem; }
+  .brand svg, .brand img { width: 2rem; height: 2rem; }
   .nav { display: grid; gap: var(--space-1); }
   .nav a { position: relative; display: flex; align-items: center; gap: var(--space-3); min-height: var(--touch-min); padding: 0 var(--space-3); border-radius: var(--radius-m); color: var(--text-2); text-decoration: none; font-weight: var(--weight-medium); }
   .nav a:hover { background: var(--surface-2); color: var(--text-1); }

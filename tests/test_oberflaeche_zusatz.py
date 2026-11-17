@@ -45,6 +45,17 @@ class TestFavicon(unittest.TestCase):
         self.assertLess(r.index("if path in ICONS:"), r.index("if not self.authed():"), "Icons muessen vor der Anmeldepruefung kommen")
         for p in ("/favicon.svg", "/favicon.ico", "/apple-touch-icon.png"):
             self.assertIn('"%s"' % p, r)
+        for p in ("/logo-box.svg", "/logo-link.svg"):
+            self.assertIn('"%s"' % p, r)
+
+    def test_logos_sind_vorhanden(self):
+        for f in ("favicon.svg", "logo-link.svg"):
+            svg = _read(os.path.join(WEB, "icons", f))
+            self.assertTrue(svg.lstrip().startswith("<svg"), f)
+            self.assertIn("#22d3ee", svg, f + ": cyanfarbener Rand")
+            self.assertIn("#fb923c", svg, f + ": orange Plakette")
+        for page in ("index.html", "neu/index.html"):
+            self.assertIn('src="/logo-box.svg"', _read(os.path.join(WEB, page)), page)
 
 
 class TestStreamIdAnzeigen(unittest.TestCase):
