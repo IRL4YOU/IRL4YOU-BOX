@@ -12,6 +12,7 @@
     const T = Neu.slots.netz = Neu.tabbed(sec, 'Netzwerk');
     const linkHost = h('div'), linkLines = h('div'); let linkSig = '';
     const LINK_APP = 'https://github.com/IRL4YOU/IRL4YOU-Cam/releases/latest', LINK_INFO = 'https://github.com/IRL4YOU/IRL4YOU-Cam';
+    const linkLinks = () => h('p', { class: 'cluster', style: 'font-size:var(--text-sm)' }, h('a', { href: LINK_APP, target: '_blank', rel: 'noopener', text: 'App herunterladen' }), h('a', { href: LINK_INFO, target: '_blank', rel: 'noopener', text: 'Beschreibung der App' }));
     const linkLogo = px => h('img', { src: '/logo-link.svg', alt: '', width: px, height: px, style: 'border-radius:22%' });
     T.add('n1', 'Leitungen', leitungen); T.add('n2', 'Server und Bitrate', server); T.add('n-link', 'Stream Link', h('div', { class: 'stack' }, linkHost));
     const subP = h('p', { id: 'net-sub' }); sec.querySelector('.page-head > div').append(subP);
@@ -25,7 +26,7 @@
       const sg = JSON.stringify(d); if (sg === linkSig && linkHost.firstChild) return;
       if (linkHost.contains(document.activeElement) && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') return;
       linkSig = sg;
-      const kids = [sw({ checked: !!d.enabled, label: 'Zweites Handy als zusätzlichen Sendeweg nutzen', s: 'Stream Link', k: 'stream link cam link zweites handy mobilfunk sendeweg', onchange: on => linkPost({ enabled: on }) })];
+      const kids = [linkLinks(), sw({ checked: !!d.enabled, label: 'Zweites Handy als zusätzlichen Sendeweg nutzen', s: 'Stream Link', k: 'stream link cam link zweites handy mobilfunk sendeweg', onchange: on => linkPost({ enabled: on }) })];
       if (d.enabled && !d.service) kids.push(alertBox({ tone: 'warn', text: 'Der Stream-Link-Dienst läuft nicht. Spiele das Software-Update ein oder starte die Box neu.' }));
       if (d.enabled && d.service && !d.target) kids.push(alertBox({ tone: 'warn', text: 'Wähle zuerst einen SRTLA-Server.' }));
       if (d.enabled) {
@@ -43,7 +44,7 @@
       kids.push(disclosure('Wie funktioniert das?', h('div', { class: 'stack', style: '--gap:var(--space-2)' },
         h('p', { class: 'muted', style: 'font-size:var(--text-sm)' }, 'Ein zweites Handy mit der App „IRL4YOU Stream Link“ schickt einen Teil der Daten über sein eigenes Mobilfunknetz. Es muss im selben Netz wie die Box hängen, zum Beispiel am Router. Gib in der App dasselbe Passwort ein und lass sie laufen, die Box findet das Handy selbst.'),
         h('p', { class: 'muted', style: 'font-size:var(--text-sm)' }, 'Die App „IRL4YOU Stream Link“ erweitert das Netz der Box über ein zweites Handy und ist für diese Box gemacht.'),
-        h('p', { class: 'cluster', style: 'font-size:var(--text-sm)' }, h('a', { href: LINK_APP, target: '_blank', rel: 'noopener', text: 'App herunterladen' }), h('a', { href: LINK_INFO, target: '_blank', rel: 'noopener', text: 'Beschreibung der App' })))));
+        )));
       linkHost.replaceChildren(card({ title: 'Stream Link', logo: linkLogo(40), body: kids.filter(Boolean) }));
     }
 
@@ -69,7 +70,7 @@
         return row({ icon: 'wifi', title: hs.length > 1 ? `Zweites Handy ${i + 1}` : 'Zweites Handy', desc: h('span', null, h('span', { class: 'num', text: rate }), h('br'), info),
           end: badge('Verbunden', 'ok') });
       });
-      linkLines.replaceChildren(card({ title: 'Stream Link', logo: linkLogo(32), sub: 'Werden als zusätzliche Leitung genutzt, solange sie verbunden sind. Einstellungen im Reiter „Stream Link“.', body: list(rows), flush: true }));
+      linkLines.replaceChildren(card({ title: 'Stream Link', logo: linkLogo(32), foot: [linkLinks()], sub: 'Werden als zusätzliche Leitung genutzt, solange sie verbunden sind. Einstellungen im Reiter „Stream Link“.', body: list(rows), flush: true }));
     }
 
     /* ================= Leitungen ================= */

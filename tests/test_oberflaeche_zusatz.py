@@ -54,6 +54,11 @@ class TestFavicon(unittest.TestCase):
         self.assertIn("function lightOf(m)", boot)
         self.assertIn("Neu.alertInfo", _read(os.path.join(WEB, "neu", "views", "live.js")))
 
+    def test_stream_link_zeigt_die_app_links_offen(self):
+        netz = _read(os.path.join(WEB, "neu", "views", "netz.js"))
+        self.assertIn("IRL4YOU-Cam/releases/latest", netz)
+        self.assertGreaterEqual(netz.count("linkLinks()"), 2, "Links in der Stream-Link-Karte und in der Karte unter Leitungen")
+
     def test_logos_sind_vorhanden(self):
         for f in ("favicon.svg", "logo-link.svg"):
             svg = _read(os.path.join(WEB, "icons", f))
