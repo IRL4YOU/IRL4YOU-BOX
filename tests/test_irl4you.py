@@ -286,6 +286,31 @@ class TestKartennamen(unittest.TestCase):
         m2 = self.nn.initial_map(cards, {})
         self.assertEqual(m2, {"02:00:00:00:00:01": "eth0", "02:00:00:00:00:02": "eth1"}, "ohne Vorwissen nach Bus-Lage")
 
+    def test_wlan_sticks_bekommen_feste_namen_ohne_p2p(self):
+        d = tempfile.mkdtemp()
+        try:
+            def card(name, mac, port):
+                os.makedirs(os.path.join(d, name))
+                open(os.path.join(d, name, "address"), "w").write(mac + "\n")
+                os.makedirs(os.path.join(d, "dev" + name))
+                os.symlink(os.path.join(d, "dev" + name), os.path.join(d, name, "device"))
+            card("wlan0", "02:00:00:00:00:0a", 4)
+            card("wlan1", "02:00:00:00:00:0b", 3)
+            card("p2p0", "02:00:00:00:00:0b", 3)
+            w = self.nn.wifi_cards(d)
+            self.assertEqual(sorted(w), ["wlan0", "wlan1"], "p2p0 zählt nicht")
+            seen = {"wlan0": "02:00:00:00:00:0a", "wlan1": "02:00:00:00:00:0b"}
+            m = self.nn.initial_map(w, seen, "wlan")
+            self.assertEqual(m, {"02:00:00:00:00:0a": "wlan0", "02:00:00:00:00:0b": "wlan1"})
+            self.assertEqual(self.nn.initial_map(w, {}, "wlan").values().__len__(), 2)
+            text = self.nn.link_text("02:00:00:00:00:0b", "wlan1")
+            self.assertIn("OriginalName=wlan*", text, "p2p0 hat dieselbe MAC und darf nicht umbenannt werden")
+            self.assertNotIn("Type=ether", text)
+            self.assertIn("Type=ether", self.nn.link_text("c0:74:2b:fe:fa:3a", "eth0"))
+            self.assertEqual(self.nn.initial_map({}, {"wlan0": "02:00:00:00:00:0a"}, "eth"), {}, "LAN-Zuordnung ignoriert WLAN-Namen")
+        finally:
+            shutil.rmtree(d)
+
     def test_link_dateien(self):
         d = tempfile.mkdtemp()
         try:

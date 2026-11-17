@@ -140,6 +140,25 @@ class HelperChecks(unittest.TestCase):
         self.assertIn("Kanal", str(e.exception))
         self.assertNotIn("802.1X", str(e.exception))
 
+    def test_automatisch_wird_zu_einem_erlaubten_kanal(self):
+        d = tempfile.mkdtemp()
+        calls = []
+
+        def nm(*args, stdin=None, timeout=60):
+            calls.append(args)
+            return mock.Mock(returncode=0, stdout="", stderr="")
+        for band, channels, want in (("a", OPEN_CH, "36"), ("bg", OPEN_CH, "1")):
+            calls.clear()
+            with mock.patch.multiple(H, HOTSPOT_FILE=os.path.join(d, "hotspot.json"), STATE=d), \
+                    mock.patch.object(H, "check_iface", lambda i: None), mock.patch.object(H, "nm", nm), \
+                    mock.patch.object(H, "wifi_caps", lambda i: {"ap": True, "2ghz": True, "5ghz": True}), \
+                    mock.patch.object(H, "wifi_channels", lambda i: channels), mock.patch.object(H, "connection_names", lambda: []), \
+                    mock.patch.object(H, "bind_to_card", lambda n, i: None):
+                H.do_hotspot_start({"iface": "wlan0", "ssid": "Box", "password": "geheim1234", "band": band, "channel": 0})
+            add = next(c for c in calls if c[:2] == ("con", "add"))
+            self.assertEqual(add[add.index("802-11-wireless.channel") + 1], want)
+            self.assertEqual(add[add.index("wifi-sec.pmf") + 1], "disable")
+
 
 class ServerChecks(unittest.TestCase):
     REQ = {"action": "hotspot_start", "iface": "wlan1", "ssid": "Box", "password": "geheim1234", "band": "a", "channel": 149}
