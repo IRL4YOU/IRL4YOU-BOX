@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""pipbox-link: ein zweites Handy (App "IRL4YOU Stream Link") als zusätzlicher Sendeweg.
+"""pipbox-link: Handys (App "IRL4YOU Stream Link") als zusätzliche Sendewege (bis zu 8).
 
 Das Hilfshandy hängt im selben Netz (Router) wie die Box und reicht UDP über seinen eigenen Mobilfunk an den SRTLA-Server weiter.
 Dieser Dienst sucht es (HELLO als Rundruf), meldet die Box an (CHALLENGE -> OPEN -> OK), hält die Sitzung mit PING offen und trägt die
@@ -40,7 +40,7 @@ OPEN_TIMEOUT_S = 5.0
 RETRY_AFTER_ERR_S = 10.0
 HELLO_SEARCH_S = 3.0        # ohne Hilfshandy auf der Karte so oft suchen
 HELLO_IDLE_S = 20.0         # mit Hilfshandy seltener (weitere Hilfshandys finden)
-MAX_HELPERS = 3
+MAX_HELPERS = 8
 CONF_EVERY_S = 2.0
 IFACE_EVERY_S = 5.0
 SKIP_PREFIX = ("lo", "docker", "veth", "br-", "virbr", "p2p", "tailscale", "tun", "tap", "wg", "zt")
@@ -91,7 +91,13 @@ def parse_pong(data):
     if len(data) < 22:
         return None
     session, battery, mobile, up, down = struct.unpack(">IBBQQ", data[:22])
-    return {"session": session, "battery": None if battery == 255 else battery, "mobile": bool(mobile), "up": up, "down": down}
+    # Akku-Byte: 0..100 = Prozent, 255 = unbekannt; 128 + Prozent = das Handy lädt (ältere Apps senden nie 128..228, sie melden nur den Stand)
+    level, charging = battery, False
+    if battery >= 128:
+        level, charging = battery - 128, True
+    if level > 100:
+        level, charging = None, False
+    return {"session": session, "battery": level, "charging": charging, "mobile": bool(mobile), "up": up, "down": down}
 
 
 # ---- Hilfsfunktionen ----
@@ -170,13 +176,14 @@ class Helper:
         self.t_open = time.monotonic()
         self.t_ping = self.t_pong = 0.0
         self.battery, self.mobile, self.up, self.down = None, None, 0, 0
+        self.charging = False
         self.err = None
         self.t_err = 0.0
 
     def public(self):
         d = {"id": self.hid.hex(), "ip": self.ip, "iface": self.iface, "state": self.state}
         if self.state == "up":
-            d.update({"battery": self.battery, "mobile": self.mobile, "mb_up": round(self.up / 1e6, 1),
+            d.update({"battery": self.battery, "charging": self.charging, "mobile": self.mobile, "mb_up": round(self.up / 1e6, 1),
                       "mb_down": round(self.down / 1e6, 1)})
         if self.err:
             d["error"] = self.err
@@ -317,6 +324,7 @@ class Linker:
             if pg and pg["session"] == h.session:
                 h.t_pong = now
                 h.battery, h.mobile, h.up, h.down = pg["battery"], pg["mobile"], pg["up"], pg["down"]
+                h.charging = pg["charging"]
 
     # -- Takt --
     def tick(self, now):

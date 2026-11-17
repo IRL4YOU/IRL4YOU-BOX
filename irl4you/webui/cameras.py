@@ -229,7 +229,7 @@ class CameraStore:
 
 
 class DeviceNames:
-    KEY_RE = re.compile(r"^(usb:[0-9a-f]{4}:[0-9a-f]{4}|if:[a-z0-9]{2,15}|net:[a-z0-9]{2,15}|bt:([0-9A-F]{2}:){5}[0-9A-F]{2})$")
+    KEY_RE = re.compile(r"^(usb:[0-9a-f]{4}:[0-9a-f]{4}|if:[a-z0-9]{2,15}|net:[a-z0-9]{2,15}|bt:([0-9A-F]{2}:){5}[0-9A-F]{2}|link:[0-9a-f]{16})$")
 
     def __init__(self, state_dir):
         self.path = os.path.join(state_dir, "device-names.json")
@@ -253,6 +253,10 @@ class DeviceNames:
 
     def label(self, key, default):
         return self._all().get(key) or default
+
+    def link_names(self):
+        """Eigene Namen der Stream-Link-Handys: {Kennung: Name}."""
+        return {k[5:]: v for k, v in self._all().items() if k.startswith("link:") and v}
 
     def conn_names(self):
         return {k[4:]: v for k, v in self._all().items() if k.startswith("net:") and v}

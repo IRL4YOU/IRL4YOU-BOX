@@ -23,6 +23,7 @@
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/>',
     battery: '<rect x="3" y="8" width="16" height="9" rx="2"/><path d="M21 11v3"/>',
     plug: '<path d="M9 3v5M15 3v5M7 8h10v4a5 5 0 0 1-10 0zM12 17v4"/>',
+    bolt: '<path d="M13 3 5.5 13.5H11L10 21l7.5-10.5H12z"/>',
     refresh: '<path d="M20 11a8 8 0 0 0-14.3-4.3L4 8.5M4 4v4.5h4.5M4 13a8 8 0 0 0 14.3 4.3L20 15.5M20 20v-4.5h-4.5"/>',
     trash: '<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',

@@ -1,4 +1,4 @@
-"""IRL4YOU BOX Oberfläche: zweites Handy als zusätzlicher Sendeweg (Dienst pipbox-link, App "IRL4YOU Stream Link")."""
+"""IRL4YOU BOX Oberfläche: Handys als zusätzliche Sendewege (Dienst pipbox-link, App "IRL4YOU Stream Link")."""
 
 import json
 import os
@@ -8,6 +8,7 @@ from .common import iface_ips
 
 IFACE_RE = re.compile(r"^[A-Za-z0-9_.:-]{0,15}$")
 MAX_PASSWORD = 64
+MAX_HELPERS = 8                  # so viele Handys zeigt die Oberfläche (der Dienst pipbox-link hat dieselbe Grenze)
 
 
 class LinkStore:
@@ -16,6 +17,7 @@ class LinkStore:
     def __init__(self, state_dir, demo=False):
         self.path = os.path.join(state_dir, "link.json")
         self.demo = demo
+        self.names = None           # DeviceNames: eigene Namen der Handys (wird von main gesetzt)
         self.data = {"enabled": False, "password": "", "iface": ""}
         try:
             with open(self.path) as f:
@@ -37,14 +39,20 @@ class LinkStore:
 
     def status(self):
         if self.demo:
-            live = {"helpers": [{"id": "0102030405060708", "ip": "192.168.1.50", "iface": "eth0", "state": "up", "battery": 81,
-                                 "mobile": True, "mb_up": 12.3, "mb_down": 1.2}] if self.data["enabled"] else [],
+            live = {"helpers": [{"id": "0102030405060708", "ip": "192.168.1.50", "iface": "eth0", "state": "up", "battery": 81, "charging": True,
+                                 "mobile": True, "mb_up": 12.3, "mb_down": 1.2},
+                                {"id": "1112131415161718", "ip": "192.168.1.51", "iface": "eth0", "state": "up", "battery": 47, "charging": False,
+                                 "mobile": True, "mb_up": 8.1, "mb_down": 0.9}] if self.data["enabled"] else [],
                     "target": True, "searching": False}
             service = True
         else:
             live = self._live()
             service = bool(live)
-        helpers = [h for h in live.get("helpers", []) if isinstance(h, dict)][:3]
+        helpers = [dict(h) for h in live.get("helpers", []) if isinstance(h, dict)][:MAX_HELPERS]
+        own = self.names.link_names() if self.names else {}
+        for h in helpers:
+            if own.get(str(h.get("id"))):
+                h["name"] = own[str(h.get("id"))]
         return {**self.data, "service": service, "target": live.get("target", True) is not False,
                 "searching": live.get("searching") is True, "helpers": helpers,
                 "interfaces": [{"iface": o["iface"], "label": o["label"]} for o in iface_ips()]}

@@ -106,6 +106,42 @@ class TestHdmiKameraAus(unittest.TestCase):
         self.assertFalse({x["key"]: x for x in m["cameras"]}["hdmi"]["parked"])
 
 
+class TestStreamLinkHandys(unittest.TestCase):
+    """Handys des Stream Links: eigene Namen, bis zu 8, gemeinsamer Code für Netzwerk und Live."""
+
+    def test_namen_der_handys(self):
+        with tempfile.TemporaryDirectory() as d:
+            names = irl("webui.cameras").DeviceNames(d)
+            names.set("link:0102030405060708", "Rucksack")
+            self.assertEqual(names.link_names(), {"0102030405060708": "Rucksack"})
+            with self.assertRaises(ValueError):
+                names.set("link:xyz", "x")
+            ls = irl("webui.link").LinkStore(d, demo=True)
+            ls.names = names
+            ls.data["enabled"] = True
+            hs = {h["id"]: h for h in ls.status()["helpers"]}
+            self.assertEqual(hs["0102030405060708"]["name"], "Rucksack")
+            self.assertNotIn("name", hs["1112131415161718"], "ohne eigenen Namen kein Feld")
+            names.set("link:0102030405060708", "")
+            self.assertEqual(names.link_names(), {}, "leerer Name setzt zurück")
+
+    def test_bis_zu_acht_handys(self):
+        for rel, need in (("pipbox-link.py", "MAX_HELPERS = 8"), ("pipbox_send.py", "LINK_RX.match(r)][:8]"), (os.path.join("webui", "link.py"), "MAX_HELPERS = 8")):
+            self.assertIn(need, _read(os.path.join(IRL, rel)), rel)
+
+    def test_gemeinsamer_code_fuer_netzwerk_und_live(self):
+        self.assertIn('src="/neu/link.js"', _read(os.path.join(WEB, "neu", "index.html")))
+        self.assertIn("Neu.linkRows", _read(os.path.join(WEB, "neu", "views", "live.js")))
+        self.assertIn("Neu.linkRows", _read(os.path.join(WEB, "neu", "views", "netz.js")))
+
+    def test_kein_zweites_handy_mehr(self):
+        for rel in ("README.md", "CHANGELOG.md"):
+            txt = _read(os.path.join(os.path.dirname(IRL), rel)).lower()
+            self.assertNotIn("zweites handy", txt, rel)
+            self.assertNotIn("second phone", txt, rel)
+        self.assertNotIn("zweite", _read(os.path.join(WEB, "neu", "views", "netz.js")).lower())
+
+
 class TestStreamIdAnzeigen(unittest.TestCase):
     def test_store(self):
         with tempfile.TemporaryDirectory() as d:

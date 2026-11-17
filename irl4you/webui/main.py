@@ -159,6 +159,7 @@ def main():
     Handler.netaddr = ExtraAddress(args.state, demo=args.demo)
     Handler.modems = pipbox_modem.Modems(args.state, demo=args.demo)
     Handler.link = LinkStore(args.state, demo=args.demo)
+    Handler.link.names = Handler.names
     LimitedHTTPServer.ui_access = Handler.uiaccess
     LimitedHTTPServer.allow_public = args.allow_public
     srv = LimitedHTTPServer((args.host, args.port), Handler)

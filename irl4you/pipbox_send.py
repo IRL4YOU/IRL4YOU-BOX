@@ -310,7 +310,7 @@ def link_lines(path=None):
             rows = f.read().splitlines()
     except OSError:
         return []
-    return [r for r in rows if LINK_RX.match(r)][:3]
+    return [r for r in rows if LINK_RX.match(r)][:8]
 
 
 def prepare():

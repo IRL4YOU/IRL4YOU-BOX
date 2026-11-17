@@ -1,5 +1,5 @@
 [Unit]
-Description=IRL4YOU BOX Stream Link (zweites Handy als zusätzlicher Sendeweg, bleibt ohne Einschalten in der Oberfläche untätig)
+Description=IRL4YOU BOX Stream Link (Handys als zusätzliche Sendewege, bleibt ohne Einschalten in der Oberfläche untätig)
 After=network.target
 
 [Service]

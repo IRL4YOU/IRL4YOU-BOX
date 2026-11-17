@@ -27,6 +27,30 @@ def load(tmp, port):
     return m
 
 
+class TestPongAkku(unittest.TestCase):
+    """Akku-Byte der PONG-Nachricht: 0..100 Prozent, 255 unbekannt, 128 + Prozent = lädt."""
+
+    def pong(self, byte):
+        tmp = tempfile.mkdtemp()
+        m = load(tmp, 18390)
+        return m.parse_pong(struct.pack(">IBBQQ", 7, byte, 1, 5, 2))
+
+    def test_stand_ohne_laden(self):
+        p = self.pong(77)
+        self.assertEqual((p["battery"], p["charging"]), (77, False))
+
+    def test_laedt(self):
+        p = self.pong(128 + 77)
+        self.assertEqual((p["battery"], p["charging"]), (77, True))
+        p = self.pong(128 + 100)
+        self.assertEqual((p["battery"], p["charging"]), (100, True))
+
+    def test_unbekannt_und_ungueltig(self):
+        for b in (255, 101, 127, 229):
+            p = self.pong(b)
+            self.assertEqual((p["battery"], p["charging"]), (None, False), b)
+
+
 class FakePhone:
     """Gegenstelle wie die App: HELLO -> CHALLENGE, OPEN prüfen -> OK/ERR, PING -> PONG."""
 
