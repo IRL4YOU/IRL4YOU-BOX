@@ -561,6 +561,12 @@ def do_hotspot_start(req):
     saved = saved if isinstance(saved, dict) else {}
     ssid, pw, band, ch = hs_values(req, saved)
     hs_check_caps(iface, band, ch)
+    use_ch = ch
+    if not use_ch:
+        # "automatisch": NetworkManager würde selbst wählen und nimmt auch Kanäle, die die Karte sperrt
+        allowed = wifi_channels(iface)
+        if allowed is not None:
+            use_ch = next((n for n in AUTO_NEED[band] if n in allowed.get(band, [])), 0)
     name = hs_name(iface)
     mine = hwaddr(iface)
     if name in [p[0] for p in connection_names()]:
@@ -571,10 +577,11 @@ def do_hotspot_start(req):
             nm("con", "delete", "id", name)
     args = ["con", "add", "type", "wifi", "ifname", iface, "con-name", name, "autoconnect", "yes", "ssid", ssid,
             "802-11-wireless.mode", "ap", "802-11-wireless.band", band]
-    if ch:
-        args += ["802-11-wireless.channel", str(ch)]
+    if use_ch:
+        args += ["802-11-wireless.channel", str(use_ch)]
     args += ["ipv4.method", "shared", "ipv6.method", "ignore", "connection.autoconnect-priority", "100",
-             "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.proto", "rsn", "wifi-sec.pairwise", "ccmp", "wifi-sec.group", "ccmp", "wifi-sec.psk", pw]
+             "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.proto", "rsn", "wifi-sec.pairwise", "ccmp", "wifi-sec.group", "ccmp",
+             "wifi-sec.pmf", "disable", "wifi-sec.psk", pw]    # PMF aus: manche Treiber lehnen sonst den Schlüssel ab
     r = nm(*args, timeout=30)
     if r.returncode == 0:
         bind_to_card(name, iface)
@@ -594,7 +601,7 @@ def do_hotspot_start(req):
     data = hs_load()
     data[iface] = {"ssid": ssid, "password": pw, "band": band, "channel": ch}
     hs_store(data)
-    return f"Hotspot „{ssid}“ läuft auf {iface} ({'5' if band == 'a' else '2,4'} GHz, Kanal {ch or 'automatisch'})"
+    return f"Hotspot „{ssid}“ läuft auf {iface} ({'5' if band == 'a' else '2,4'} GHz, Kanal {use_ch or 'automatisch'})"
 
 
 def do_hotspot_stop(req):

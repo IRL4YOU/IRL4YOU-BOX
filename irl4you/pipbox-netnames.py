@@ -28,6 +28,8 @@ LINK_DIR = "/etc/systemd/network"
 LINK_PREFIX = "10-irl4you-"
 MAC_RE = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
 NAME_RE = re.compile(r"^eth\d{1,2}$")
+WLAN_RE = re.compile(r"^wlan\d{1,2}$")
+ANY_NAME_RE = re.compile(r"^(eth|wlan)\d{1,2}$")
 
 
 def _read(path):
@@ -59,25 +61,45 @@ def wired_cards(sysnet=SYS_NET):
     return out
 
 
-def initial_map(cards, seen):
+def wifi_cards(sysnet=SYS_NET):
+    """WLAN-Karten (USB-Sticks u. a.): {name: (mac, bus_path)}. Die Schnittstelle p2p0 (gleiche MAC wie wlan0) zählt nicht."""
+    out = {}
+    try:
+        names = sorted(os.listdir(sysnet))
+    except OSError:
+        return out
+    for n in names:
+        base = os.path.join(sysnet, n)
+        if not WLAN_RE.match(n) or not os.path.exists(os.path.join(base, "device")):
+            continue
+        mac = _read(os.path.join(base, "address")).lower()
+        if MAC_RE.match(mac):
+            out[n] = (mac, os.path.realpath(os.path.join(base, "device")))
+    return out
+
+
+def initial_map(cards, seen, prefix="eth"):
     """Erste Zuordnung: zuletzt gesehene Namen, sonst nach Bus-Lage."""
+    name_re = WLAN_RE if prefix == "wlan" else NAME_RE
     m = {}
     for name, mac in (seen or {}).items():
-        if isinstance(name, str) and NAME_RE.match(name) and isinstance(mac, str) and MAC_RE.match(mac.lower()):
+        if isinstance(name, str) and name_re.match(name) and isinstance(mac, str) and MAC_RE.match(mac.lower()):
             if mac.lower() not in m and name not in m.values():
                 m[mac.lower()] = name
     rest = sorted((path, mac) for mac, path in cards.values() if mac not in m)
     i = 0
     for _path, mac in rest:
-        while "eth%d" % i in m.values():
+        while "%s%d" % (prefix, i) in m.values():
             i += 1
-        m[mac] = "eth%d" % i
+        m[mac] = "%s%d" % (prefix, i)
     return m
 
 
 def link_text(mac, name):
+    # WLAN: nur Schnittstellen, die der Kernel wlanN nennt (p2p0 hat dieselbe MAC und darf den Namen nicht bekommen)
+    match = "OriginalName=wlan*" if name.startswith("wlan") else "Type=ether"
     return ("# IRL4YOU BOX: feste Kartennamen nach MAC (pipbox-netnames.py). Gilt ab dem nächsten Start, nie im laufenden Betrieb.\n"
-            "[Match]\nMACAddress=%s\nType=ether\n\n[Link]\nName=%s\n" % (mac, name))
+            "[Match]\nMACAddress=%s\n%s\n\n[Link]\nName=%s\n" % (mac, match, name))
 
 
 def write_links(mapping, link_dir=LINK_DIR):
@@ -107,25 +129,41 @@ def load_conf(path=CONF):
         return None
     if not isinstance(d, dict):
         return None
-    return {k.lower(): v for k, v in d.items() if isinstance(k, str) and MAC_RE.match(k.lower()) and isinstance(v, str) and NAME_RE.match(v)}
+    return {k.lower(): v for k, v in d.items() if isinstance(k, str) and MAC_RE.match(k.lower()) and isinstance(v, str) and ANY_NAME_RE.match(v)}
 
 
 def main(argv):
     cards = wired_cards()
-    mapping = load_conf()
+    wifi = wifi_cards()
+    conf = load_conf()
+    mapping = dict(conf) if conf is not None else None
+    try:
+        with open(SEEN) as f:
+            seen = json.load(f)
+    except (OSError, ValueError):
+        seen = {}
+    seen = seen if isinstance(seen, dict) else {}
     if mapping is None:
-        try:
-            with open(SEEN) as f:
-                seen = json.load(f)
-        except (OSError, ValueError):
-            seen = {}
-        mapping = initial_map(cards, seen if isinstance(seen, dict) else {})
+        mapping = initial_map(cards, seen)
+    # Feste WLAN-Namen nur für Sticks, die gerade stecken: Sticks mit wechselnder MAC sollen keine Namen ansammeln
+    here = {v[0] for v in wifi.values()}
+    mapping = {m: n for m, n in mapping.items() if not WLAN_RE.match(n) or m in here}
+    # WLAN-Karten, die noch keinen festen Namen haben, bekommen einen (neue Sticks kommen später dazu); LAN-Zuordnung bleibt unberührt
+    new_wifi = {n: v for n, v in wifi.items() if v[0] not in mapping}
+    if new_wifi:
+        taken = {n for m, n in mapping.items() if WLAN_RE.match(n)}
+        extra = initial_map(new_wifi, {k: v for k, v in seen.items() if k not in taken}, "wlan")
+        for mac, name in extra.items():
+            while name in taken:
+                name = "wlan%d" % (int(name[4:]) + 1)
+            taken.add(name)
+            mapping[mac] = name
     if "--show" in argv:
-        print(json.dumps({"cards": {n: m for n, (m, _p) in cards.items()}, "mapping": mapping}, indent=1))
+        print(json.dumps({"cards": {n: m for n, (m, _p) in {**cards, **wifi}.items()}, "mapping": mapping}, indent=1))
         return 0
     if not mapping:
         return 0
-    if load_conf() is None:
+    if conf is None or mapping != conf:
         os.makedirs(os.path.dirname(CONF), exist_ok=True)
         with open(CONF + ".tmp", "w") as f:
             json.dump(mapping, f, indent=1, sort_keys=True)
