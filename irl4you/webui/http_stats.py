@@ -39,6 +39,11 @@ class HttpStats:
             pass
         try:
             hs = self.hdmi.status() if self.hdmi else None
+            if hs and hs.get("service") and not (hs.get("settings") or {}).get("enabled"):
+                parked.add(HDMI_KEY)                    # „Als Kamera senden“ bewusst aus: die HDMI/USB-Kamera gilt als aus (kein roter Punkt, keine Warnung)
+                for c in m["cameras"]:
+                    if c.get("key") == HDMI_KEY:
+                        c["parked"] = True
             m["alerts"] = list(m.get("alerts") or []) + self.outages.alerts(m["cameras"], hs, parked)
         except Exception:
             pass
