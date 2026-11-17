@@ -33,6 +33,8 @@ class PostRoutes:
                 return self.reply(401, {"error": "nicht angemeldet"})
             if path == "/api/modems":
                 return self.reply(200, self.modems.request(d))
+            if path == "/api/link":
+                return self.reply(200, self.link.put(d))
             if path == "/api/password":
                 self.auth.change_password(d.get("old"), d.get("new"), self.ip())
                 tok = self.auth.login(d.get("new"), self.ip(), d.get("remember") is True)
