@@ -328,16 +328,82 @@ class TestKartennamen(unittest.TestCase):
         finally:
             shutil.rmtree(d)
 
-    def test_kein_umbenennen_im_betrieb(self):
-        for rel in ("pipbox-netnames.py", "install/irl4you-setup.sh", "install/system-install.sh", "install/install-2604.sh"):
+    def test_umbenennen_nur_beim_start(self):
+        """Im Betrieb wird nie umbenannt (Testbox war am 17.10.2026 deshalb 10 Minuten weg). Umbenannt wird nur vom Start-Dienst, vor dem Netzwerk, nur bei nicht aktiven Karten."""
+        for rel in ("install/irl4you-setup.sh", "install/system-install.sh", "install/install-2604.sh"):
             src = open(os.path.join(IRL, rel), encoding="utf-8").read()
             code = "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("#"))
-            for bad in ("ip link set", "subprocess", "systemctl restart NetworkManager", "nmcli connection add", "nmcli con add"):
+            for bad in ("ip link set", "systemctl restart NetworkManager", "nmcli connection add", "nmcli con add", "start pipbox-netnames", "restart pipbox-netnames"):
                 self.assertNotIn(bad, code, "%s: %r verändert im Betrieb das Netz" % (rel, bad))
-        self.assertFalse(os.path.exists(os.path.join(INSTALL, "pipbox-netnames.service")), "kein Dienst, der beim Start oder im Betrieb umbenennt")
+        nn = open(os.path.join(IRL, "pipbox-netnames.py"), encoding="utf-8").read()
+        code = "\n".join(l for l in nn.splitlines() if not l.lstrip().startswith("#"))
+        for bad in ("nmcli", "restart NetworkManager"):
+            self.assertNotIn(bad, code)
+        main_src = code[code.index("def main(argv):"):]
+        self.assertEqual(main_src.count("boot_fix()"), 1, "umbenannt wird nur über --boot")
+        self.assertIn("is_up(", code[code.index("def boot_fix"):], "aktive Karten nie umbenennen")
+        unit = open(os.path.join(INSTALL, "pipbox-netnames.service"), encoding="utf-8").read()
+        for need in ("Before=network-pre.target", "--boot", "Type=oneshot", "WantedBy=multi-user.target"):
+            self.assertIn(need, unit)
         setup = open(os.path.join(INSTALL, "irl4you-setup.sh"), encoding="utf-8").read()
         self.assertNotIn("disable --now", setup, "ifplugd/networking nicht im Betrieb anhalten")
         self.assertIn("netnames.py", setup)
+        self.assertIn("pipbox-netnames.service", setup.split("UNITS=")[1].split("\n")[0] + setup.split("UNITS=")[1].split("\n")[1])
+
+    def test_plan_tausch_ueber_zwischennamen(self):
+        plan = self.nn.plan_renames({"eth0": "A", "eth1": "B"}, {"A": "eth1", "B": "eth0"})
+        self.assertEqual(plan, [("eth0", "eth1"), ("eth1", "eth0")])
+        cmds = []
+        self.assertTrue(self.nn.apply_renames(plan, lambda o, n: cmds.append((o, n)) or True))
+        self.assertEqual(cmds, [("eth0", "pbn0"), ("eth1", "pbn1"), ("pbn0", "eth1"), ("pbn1", "eth0")], "erst alle auf Zwischennamen, dann auf die Ziele")
+
+    def test_plan_nichts_zu_tun_und_fehlende_karten(self):
+        self.assertEqual(self.nn.plan_renames({"eth0": "A", "eth1": "B"}, {"A": "eth0", "B": "eth1"}), [])
+        self.assertEqual(self.nn.plan_renames({"eth0": "A"}, {"A": "eth0", "C": "eth1"}), [], "Karte C steckt nicht")
+        self.assertEqual(self.nn.plan_renames({"eth0": "A", "eth1": "B"}, {"A": "eth1", "B": "eth1"}), [], "widersprüchlich: nichts tun")
+
+    def test_plan_fremde_karte_macht_platz(self):
+        plan = dict(self.nn.plan_renames({"eth0": "X", "eth1": "B"}, {"B": "eth0"}))
+        self.assertEqual(plan["eth1"], "eth0")
+        self.assertEqual(plan["eth0"], "eth2", "die unbekannte Karte zieht auf einen freien Namen")
+        plan = dict(self.nn.plan_renames({"wlan0": "W1", "wlan1": "W2"}, {"W1": "wlan1", "W2": "wlan0"}))
+        self.assertEqual(plan, {"wlan0": "wlan1", "wlan1": "wlan0"})
+
+    def test_fehler_beim_umbenennen_stellt_alte_namen_her(self):
+        plan = [("eth0", "eth1"), ("eth1", "eth0")]
+        cmds = []
+
+        def rename(o, n):
+            cmds.append((o, n))
+            return not (o == "pbn1" and n == "eth0")        # letzter Schritt scheitert
+        self.assertFalse(self.nn.apply_renames(plan, rename))
+        self.assertIn(("pbn1", "eth1"), cmds, "Zwischenname darf nie stehen bleiben: zurück auf den alten Namen")
+
+    def test_boot_fix_mit_nachgebauten_karten(self):
+        d = tempfile.mkdtemp()
+        try:
+            def card(name, mac, flags):
+                os.makedirs(os.path.join(d, name))
+                open(os.path.join(d, name, "address"), "w").write(mac + "\n")
+                open(os.path.join(d, name, "type"), "w").write("1\n")
+                open(os.path.join(d, name, "flags"), "w").write(flags + "\n")
+                os.makedirs(os.path.join(d, "dev-" + name))
+                os.symlink(os.path.join(d, "dev-" + name), os.path.join(d, name, "device"))
+            card("eth0", "02:00:00:00:00:0a", "0x1002")
+            card("eth1", "02:00:00:00:00:0b", "0x1002")
+            conf = os.path.join(d, "netnames.json")
+            json.dump({"02:00:00:00:00:0a": "eth1", "02:00:00:00:00:0b": "eth0"}, open(conf, "w"))
+            cmds = []
+            self.assertEqual(self.nn.boot_fix(d, conf, lambda o, n: cmds.append((o, n)) or True, wait_s=0), 0)
+            self.assertEqual(len(cmds), 4)
+            cmds.clear()
+            open(os.path.join(d, "eth0", "flags"), "w").write("0x1003\n")          # UP gesetzt: nie anfassen
+            self.nn.boot_fix(d, conf, lambda o, n: cmds.append((o, n)) or True, wait_s=0)
+            self.assertEqual(cmds, [], "aktive Karte wird nicht umbenannt")
+            self.assertEqual(self.nn.boot_fix(d, os.path.join(d, "gibtsnicht.json"), lambda o, n: 1 / 0, wait_s=0), 0, "ohne Zuordnung nichts tun")
+            self.assertEqual(self.nn.boot_fix(d, conf, lambda o, n: 1 / 0, wait_s=0), 0, "Fehler halten den Start nie auf")
+        finally:
+            shutil.rmtree(d)
 
 
 class TestNetzPruefung(unittest.TestCase):
