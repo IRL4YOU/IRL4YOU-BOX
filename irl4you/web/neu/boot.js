@@ -3,6 +3,13 @@
   'use strict';
   const { h, $, $$, App, badge } = Neu;
 
+  /* Ampel: aus den Meldungen der Box (Temperatur, Last, USB, Kameras): rot bei „crit“, gelb bei jeder anderen Meldung, sonst grün. Die Box liefert dafür kein eigenes Feld. */
+  function lightOf(m) {
+    const al = (m && m.alerts) || [], info = Neu.alertInfo;
+    const reasons = al.slice(0, 6).map(a => { const i = info ? info(a) : { title: a.text || 'Meldung', text: '' }; return { level: a.level, text: [i.title, i.text].filter(Boolean).join(': ') }; });
+    return { level: al.some(a => a.level === 'crit') ? 'crit' : al.length ? 'warn' : 'ok', reasons, live: !!(App.data.send && App.data.send.active) };
+  }
+
   /* ---------- Kopfzeile: Sendestatus und Warnlampe ---------- */
   function head() {
     const s = App.data.send, m = App.data.metrics;
@@ -14,7 +21,7 @@
       if (el.dataset.k !== k) { el.dataset.k = k; el.replaceChildren(h('span', { class: 'dot', data: running ? { pulse: '' } : {} }), h('span', { text: txt })); }
       el.dataset.tone = running ? 'live' : s.can_start || s.active ? 'accent' : '';
     }
-    const l = m && m.light, hl = $('#hb-light'), lv = l && ({ ok: 'ok', good: 'ok', warn: 'warn', crit: 'crit', bad: 'crit' })[l.level];
+    const l = m && (m.light || lightOf(m)), hl = $('#hb-light'), lv = l && ({ ok: 'ok', good: 'ok', warn: 'warn', crit: 'crit', bad: 'crit' })[l.level];
     if (lv) {                                                    // Ampel: immer sichtbar, wie in der bisherigen Oberfläche
       const txt = { ok: 'Alles okay', warn: 'Warnung', crit: 'Problem' }[lv], tone = { ok: 'ok', warn: 'warn', crit: 'danger' }[lv];
       if (hl.dataset.lv !== lv) { hl.replaceChildren(h('span', { class: 'dot' }), h('span', { text: txt })); hl.dataset.lv = lv; }
@@ -92,7 +99,7 @@
   document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); } });
 
   /* ---------- Warnlampe: Gründe zeigen ---------- */
-  $('#hb-light').addEventListener('click', () => { const l = (App.data.metrics || {}).light; if (!l) return; Neu.sheet({ title: 'Hinweise der Box', body: (l.reasons || []).length ? (l.reasons || []).map(r => Neu.alertBox({ tone: r.level === 'crit' ? 'danger' : 'warn', text: r.text })) : [h('p', { class: 'muted', text: 'Alles in Ordnung' + (l.live ? '' : ' (keine Sendung)') })], foot: [Neu.btn('Schließen', { onclick: Neu.closeSheet })] }); });
+  $('#hb-light').addEventListener('click', () => { const mm = App.data.metrics || {}, l = mm.light || (App.data.metrics ? lightOf(mm) : null); if (!l) return; Neu.sheet({ title: 'Hinweise der Box', body: (l.reasons || []).length ? (l.reasons || []).map(r => Neu.alertBox({ tone: r.level === 'crit' ? 'danger' : 'warn', text: r.text })) : [h('p', { class: 'muted', text: 'Alles in Ordnung' + (l.live ? '' : ' (keine Sendung)') })], foot: [Neu.btn('Schließen', { onclick: Neu.closeSheet })] }); });
   
   /* ---------- Bildschirm wach halten (Wake Lock, sonst unsichtbares Video) ---------- */
   (() => {
