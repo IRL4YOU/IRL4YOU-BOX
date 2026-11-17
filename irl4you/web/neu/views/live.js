@@ -393,6 +393,7 @@
 
     const USB = { wlan: 'USB-WLAN-Adapter getrennt', bt: 'USB-Bluetooth-Adapter getrennt', net: 'USB-Router getrennt', cam: 'USB-Kamera getrennt', other: 'USB-Gerät getrennt' };
     const when = t => { const d = new Date((t || 0) * 1000), hm = d.toLocaleTimeString(Neu.loc(), { hour: '2-digit', minute: '2-digit' }); return d.toDateString() === new Date().toDateString() ? `um ${hm}` : `gestern um ${hm}`; };
+    Neu.alertInfo = a => alertInfo(a);      // auch für die Ampel in der Kopfzeile
     function alertInfo(a) {
       if (a.kind === 'usb') {
         const power = a.why === 'emi' || a.why === 'over', where = [a.port ? 'USB ' + a.port : '', a.ids].filter(Boolean).join(', ');
