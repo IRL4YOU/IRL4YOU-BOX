@@ -4,6 +4,7 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 
 ## 0.5
 - Hotspot: Die Kanalauswahl richtet sich nach der WLAN-Karte, es werden nur Kanäle angeboten, die die Karte selbst freigibt (5 GHz auch 149–165, mit Hinweis zur Sendeleistung).
+- WLAN: Hotspot-Kanal „automatisch“ und feste Kartennamen nach einem Neustart.
 - Mobcam: iPhone mit Moblin per USB-Kabel als Kamera (Kameras > HDMI und USB > Quelle „Mobcam“), Bild und Ton gehen unverändert durch (H.264 oder H.265, kaum Rechenzeit); Ströme über 12 Mbit/s werden abgelehnt, in Moblin höchstens 10 Mbit/s einstellen.
 - IRL4YOU Cam: Android-Handy mit der App „IRL4YOU Cam“ per USB-Kabel als Kamera (Kameras > HDMI und USB > Quelle „IRL4YOU Cam“), ohne Netzwerk und ohne USB-Debugging; Bild und Ton gehen unverändert durch, die Box stellt die Bitrate auf höchstens 10 Mbit/s.
 - Live: Kachel „Handy“ mit Akku, Strom, Temperatur und Akkukurve des Android-Handys, solange es per USB mit der IRL4YOU Cam sendet (Strom grün beim Laden, orange wenn der Akku sinkt); die Kennzahlen-Karten sind alle gleich groß.
