@@ -23,7 +23,7 @@ irl4you-srtla -s srtla.example.net:5000 -i /run/pipbox-send/links -l 127.0.0.1:5
 | Option | Bedeutung |
 |---|---|
 | `-s HOST:PORT` | SRTLA-Empfänger (Pflicht) |
-| `-i DATEI` | Leitungsliste (Pflicht), je Zeile `IP-Adresse [Netzwerkkarte]`, `#` leitet Kommentare ein. `SIGHUP` liest sie neu, ohne die Sendung zu unterbrechen. |
+| `-i DATEI` | Leitungsliste (Pflicht), je Zeile `IP-Adresse [Netzwerkkarte] [via IP:PORT]`, `#` leitet Kommentare ein. Mit `via` geht die Leitung nicht zum Empfänger, sondern an ein Relais (zum Beispiel ein Hilfshandy), das die Pakete weiterreicht; dieselbe IP darf einmal direkt und einmal mit `via` vorkommen. `SIGHUP` liest die Liste neu, ohne die Sendung zu unterbrechen. |
 | `-l ADR:PORT` | dort nimmt das Programm SRT vom Encoder an (Standard `127.0.0.1:5000`) |
 | `-m best` | schnellste Leitung zuerst, die anderen nur, wenn ihr Fenster voll ist (Standard) |
 | `-m all` | alle genutzten Leitungen gleichzeitig, nach freiem Fensteranteil |
