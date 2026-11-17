@@ -234,6 +234,8 @@ def iface_by_mac(mac, root=None):
     except OSError:
         return None
     for n in names:
+        if n.startswith("p2p"):      # WLAN-Direct-Schnittstelle hat dieselbe MAC wie wlan0 und ist nie die Verbindung zur Kamera
+            continue
         if iface_mac(n, root) == mac:
             return n
     return None
