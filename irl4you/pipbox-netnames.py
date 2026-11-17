@@ -5,8 +5,13 @@ Mit net.ifnames=0 vergibt der Kernel eth0/eth1 in der Reihenfolge, in der die Ka
 Karten dabei manchmal die Namen (gesehen am 17.10.2026). Dieses Programm legt die Zuordnung MAC -> Name fest und schreibt sie als systemd-.link-Dateien
 (/etc/systemd/network/10-irl4you-<name>.link). udev wendet sie beim nächsten Start an, wenn die Karten erscheinen.
 
-WICHTIG: Es benennt nie im laufenden Betrieb um. Ein Umbenennen im Betrieb (per ip-Befehl) trennt die Karte, NetworkManager bricht DHCP ab und die Box ist
-nicht mehr erreichbar (so geschehen beim ersten Update-Test am 17.10.2026). Darum nur Dateien schreiben; wirksam wird es beim Start.
+WICHTIG: Im laufenden Betrieb benennt es nie um. Ein Umbenennen im Betrieb (per ip-Befehl) trennt die Karte, NetworkManager bricht DHCP ab und die Box ist
+nicht mehr erreichbar (so geschehen beim ersten Update-Test am 17.10.2026). Darum schreibt der normale Aufruf nur Dateien; wirksam werden sie beim Start.
+
+Die .link-Dateien allein reichen nicht: Haben zwei Karten die Namen getauscht (eth0 <-> eth1), scheitert udev mit „File exists“, weil jeder Zielname schon
+belegt ist, und die zufällige Reihenfolge des Kernels bleibt (gesehen am 17.11.2026). Darum läuft beim Start, vor dem Netzwerk, einmalig
+`pipbox-netnames.py --boot` (Dienst pipbox-netnames.service, Before=network-pre.target): Es tauscht über Zwischennamen (eth0 -> pbn0, eth1 -> pbn1, dann pbn0 -> eth1,
+pbn1 -> eth0). Das geschieht nur, solange die Karten noch nicht aktiv sind (Schalter UP aus); jeder Fehler lässt die Namen unverändert.
 
 Quelle der Zuordnung, in dieser Reihenfolge:
   1. /etc/pipbox/netnames.json  ({"<mac>": "eth0", …}), wenn vorhanden
@@ -15,11 +20,15 @@ Quelle der Zuordnung, in dieser Reihenfolge:
 
   pipbox-netnames.py           Zuordnung anlegen (falls noch keine da ist) und .link-Dateien schreiben
   pipbox-netnames.py --show    Zuordnung anzeigen, nichts schreiben
+  pipbox-netnames.py --boot    Namen beim Start nach der Zuordnung herstellen (nur vom Dienst beim Start, nie im Betrieb)
 """
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
+import time
 
 SYS_NET = "/sys/class/net"
 CONF = "/etc/pipbox/netnames.json"
@@ -132,7 +141,92 @@ def load_conf(path=CONF):
     return {k.lower(): v for k, v in d.items() if isinstance(k, str) and MAC_RE.match(k.lower()) and isinstance(v, str) and ANY_NAME_RE.match(v)}
 
 
+TMP_PREFIX = "pbn"      # Zwischennamen beim Tauschen (pbn0, pbn1, …)
+
+
+def plan_renames(cur, want):
+    """Welche Karten müssen wie umbenannt werden? cur: {Name: MAC} der vorhandenen Karten, want: {MAC: Name} der festen Namen.
+    Gibt [(alter Name, neuer Name), …] zurück. Karten ohne festen Namen, die einen festen Namen belegen, ziehen auf einen freien um.
+    Widersprüchliche Zuordnung (zwei Karten, ein Name): nichts tun."""
+    target = {old: want[mac] for old, mac in cur.items() if want.get(mac) and want[mac] != old}
+    finals = [want[mac] for old, mac in cur.items() if want.get(mac)]
+    if len(finals) != len(set(finals)):
+        return []
+    taken = set(finals) | set(cur)
+    for old in sorted(cur):
+        if old in target or want.get(cur[old]) == old or old not in finals:
+            continue
+        kind = "wlan" if old.startswith("wlan") else "eth"
+        k = 0
+        while "%s%d" % (kind, k) in taken:
+            k += 1
+        target[old] = "%s%d" % (kind, k)
+        taken.add(target[old])
+    return sorted(target.items())
+
+
+def ip_rename(old, new):
+    ip = shutil.which("ip") or "/usr/sbin/ip"
+    r = subprocess.run([ip, "link", "set", "dev", old, "name", new], capture_output=True, text=True, timeout=10)
+    return r.returncode == 0
+
+
+def is_up(name, sysnet=SYS_NET):
+    """Schalter UP der Karte gesetzt? Aktive Karten werden nie umbenannt (unbekannt gilt als aktiv)."""
+    try:
+        return bool(int(_read(os.path.join(sysnet, name, "flags")), 16) & 1)
+    except ValueError:
+        return True
+
+
+def apply_renames(moves, rename=ip_rename):
+    """Führt die Umbenennung über Zwischennamen aus. Schlägt ein Schritt fehl, wird alles auf die alten Namen zurückgesetzt, soweit möglich."""
+    tmp = {old: "%s%d" % (TMP_PREFIX, i) for i, (old, _new) in enumerate(moves)}
+    done = []
+    for old, _new in moves:
+        if not rename(old, tmp[old]):
+            for o in reversed(done):
+                rename(tmp[o], o)
+            return False
+        done.append(old)
+    ok = True
+    for old, new in moves:
+        if not rename(tmp[old], new):
+            ok = False
+            rename(tmp[old], old)       # Zwischenname darf nie stehen bleiben
+    return ok
+
+
+def boot_fix(sysnet=SYS_NET, conf=CONF, rename=ip_rename, wait_s=8.0, sleep=time.sleep):
+    """Beim Start: Namen nach der festen Zuordnung herstellen. Gibt immer 0 zurück (der Start darf daran nie scheitern)."""
+    try:
+        mapping = load_conf(conf) or {}
+        if not mapping:
+            return 0
+        wired = [m for m, n in mapping.items() if n.startswith("eth")]
+        waited = 0.0
+        while waited < wait_s and not all(m in {v[0] for v in wired_cards(sysnet).values()} for m in wired):
+            sleep(0.5)
+            waited += 0.5       # Karten, die gerade erst erscheinen, kurz abwarten (fehlende Steckkarten kosten höchstens diese Zeit)
+        cur = {n: v[0] for n, v in {**wired_cards(sysnet), **wifi_cards(sysnet)}.items()}
+        moves = plan_renames(cur, mapping)
+        if not moves:
+            print("pipbox-netnames: Namen stimmen mit der Zuordnung überein")
+            return 0
+        busy = [n for pair in moves for n in pair if n in cur and is_up(n, sysnet)]
+        if busy:
+            print("pipbox-netnames: Karte(n) schon aktiv (%s): nichts umbenannt" % ", ".join(sorted(set(busy))))
+            return 0
+        ok = apply_renames(moves, rename)
+        print("pipbox-netnames: %s: %s" % ("umbenannt" if ok else "Umbenennen fehlgeschlagen, alte Namen belassen", ", ".join("%s -> %s" % m for m in moves)))
+    except Exception as e:      # nichts darf den Start aufhalten
+        print("pipbox-netnames: Fehler, nichts geändert: %s" % e)
+    return 0
+
+
 def main(argv):
+    if "--boot" in argv:
+        return boot_fix()
     cards = wired_cards()
     wifi = wifi_cards()
     conf = load_conf()
@@ -156,6 +250,16 @@ def main(argv):
         for mac, name in extra.items():
             while name in taken:
                 name = "wlan%d" % (int(name[4:]) + 1)
+            taken.add(name)
+            mapping[mac] = name
+    # Neue LAN-Karten (zum Beispiel USB-Netzwerkkarten) bekommen ebenfalls einen festen Namen; die eingebauten bleiben, wie sie sind
+    new_wired = {n: v for n, v in cards.items() if v[0] not in mapping}
+    if new_wired and conf is not None:
+        taken = {n for m, n in mapping.items() if NAME_RE.match(n)}
+        extra = initial_map(new_wired, {k: v for k, v in seen.items() if k not in taken}, "eth")
+        for mac, name in extra.items():
+            while name in taken:
+                name = "eth%d" % (int(name[3:]) + 1)
             taken.add(name)
             mapping[mac] = name
     if "--show" in argv:
