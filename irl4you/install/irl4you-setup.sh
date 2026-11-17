@@ -146,7 +146,7 @@ done
 rm -f /etc/systemd/system/pipbox-swupdate.service /etc/systemd/system/pipbox-swupdate.path /etc/systemd/system/pipbox-update.service /etc/systemd/system/pipbox-update.path
 mkdir -p /etc/systemd/system/tailscaled.service.d
 [ -f "$HERE/install/tailscaled-pipbox-order.conf" ] && install -m 644 "$HERE/install/tailscaled-pipbox-order.conf" /etc/systemd/system/tailscaled.service.d/pipbox-order.conf
-UNITS="pipbox.service pipbox-dji.service pipbox-hdmi.service pipbox-health.service pipbox-arp.service
+UNITS="pipbox.service pipbox-dji.service pipbox-hdmi.service pipbox-health.service pipbox-arp.service pipbox-link.service
   pipbox-send-ctl.path pipbox-remote.path pipbox-remote-heal.timer pipbox-wifi.path
   pipbox-power.path pipbox-logmode.path pipbox-netaddr.path pipbox-logs.path pipbox-ssh.path pipbox-btdriver.timer pipbox-btdriver.path
   pipbox-wlandriver.timer pipbox-btchip.path pipbox-btchip.service pipbox-logrotate.timer pipbox-preview.socket
@@ -165,7 +165,7 @@ if now; then
   fi
   if [ "$SRS_OK" = 1 ]; then systemctl start irl4you-srs.service pipbox-rtmpstat.service || echo "WARNUNG: irl4you-srs lief nicht an" >&2; fi
   # Dienste, die schon laufen, startet der Update-Helfer laut Manifest ("restart") neu; hier nur, was noch nicht läuft
-  systemctl start pipbox-dji.service pipbox-hdmi.service pipbox-health.service pipbox.service
+  systemctl start pipbox-dji.service pipbox-hdmi.service pipbox-health.service pipbox.service pipbox-link.service
   systemctl start pipbox-modem-apply.timer --no-block || true
   # Treiber-Helfer neu prüfen lassen, sonst zeigt die Oberfläche bis zum nächsten Einstecken/Timer den alten Zustand
   systemctl start pipbox-btdriver.service pipbox-wlandriver.service --no-block || true
