@@ -134,9 +134,10 @@
     return h('div', { class: 'alert', data: { tone }, role: tone === 'danger' ? 'alert' : null }, ic,
       h('div', { class: 'alert__body' }, title && h('span', { class: 'alert__title', text: title }), text && h('span', { text }), actions && actions.length ? h('div', { class: 'alert__actions' }, actions) : null));
   }
-  function card({ title, sub, actions, body, foot, flush }) {
+  function card({ title, sub, actions, body, foot, flush, logo }) {
+    const head = h('div', null, title && h('h2', { class: 'card__title', text: title }), sub && h('p', { class: 'card__sub', text: sub }));      // logo: kleines Bild vor dem Titel (zum Beispiel das Stream-Link-Logo)
     return h('section', { class: 'card' },
-      (title || actions) && h('div', { class: 'card__head' }, h('div', null, title && h('h2', { class: 'card__title', text: title }), sub && h('p', { class: 'card__sub', text: sub })), actions && h('div', { class: 'cluster' }, actions)),
+      (title || actions || logo) && h('div', { class: 'card__head' }, logo ? h('div', { class: 'cluster', style: 'flex-wrap:nowrap;align-items:flex-start' }, logo, head) : head, actions && h('div', { class: 'cluster' }, actions)),
       h('div', { class: 'card__body', data: flush ? { flush: '' } : {}, style: flush ? 'padding-top:var(--space-3)' : null }, body),
       foot && h('div', { class: 'card__foot' }, foot));
   }
