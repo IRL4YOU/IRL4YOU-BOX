@@ -58,6 +58,43 @@ class TestFavicon(unittest.TestCase):
             self.assertIn('src="/logo-box.svg"', _read(os.path.join(WEB, page)), page)
 
 
+class TestHdmiKameraAus(unittest.TestCase):
+    """Ist „Als Kamera senden“ (HDMI/USB/Testbild) aus, gilt die Kamera hdmi als aus: nicht rot, keine Warnung."""
+
+    def metrics(self, enabled):
+        from types import SimpleNamespace as NS
+        H = irl("webui.http_stats").HttpStats
+        h = object.__new__(H)
+        cams = [{"key": "hdmi", "name": "IRL4YOU Cam", "state": "offline"}, {"key": "dji-1", "name": "Osmo", "state": "live", "fps": 30}]
+        seen = {}
+        h.sampler = NS(sample=lambda: {"alerts": []})
+        h.usbwatch = NS(alerts=lambda: [])
+        h.netaddr = NS(warning=lambda: [])
+        h.cams = NS(listing=lambda host, f: [dict(c) for c in cams])
+        h.host = lambda: "10.0.0.1"
+        h.pipeline = NS(cfg={"type": "pip", "main": "dji-1"})
+        h.djisvc = NS(host_for_key=None, parked_keys=lambda: set(), camera_extras=lambda: {}, fps_for_key=lambda k: None)
+        h.hdmi = NS(status=lambda: {"service": True, "settings": {"enabled": enabled}})
+        h.outages = NS(alerts=lambda cameras, hs, parked: seen.setdefault("parked", set(parked)) and [] or [])
+        h.srtla = NS(data={})
+        h.names = None
+        h.wifi = None
+        h.send = NS(picture=lambda: None, measured_fps=lambda: {})
+        h.fpsprobe = None
+        return h.metrics_data(), seen
+
+    def test_aus_ist_geparkt(self):
+        m, seen = self.metrics(False)
+        c = {x["key"]: x for x in m["cameras"]}
+        self.assertTrue(c["hdmi"]["parked"])
+        self.assertFalse(c["dji-1"]["parked"])
+        self.assertIn("hdmi", seen["parked"])
+
+    def test_an_bleibt_normal(self):
+        m, _ = self.metrics(True)
+        self.assertFalse({x["key"]: x for x in m["cameras"]}["hdmi"]["parked"])
+
+
 class TestStreamIdAnzeigen(unittest.TestCase):
     def test_store(self):
         with tempfile.TemporaryDirectory() as d:
