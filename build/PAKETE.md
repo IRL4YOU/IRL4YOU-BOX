@@ -12,5 +12,6 @@ Alle Pakete wurden auf der Box selbst gebaut und dort getestet (Skripte in `buil
 | `irl4you-gst-rockchip` | GStreamer-Elemente mpph264enc, mpph265enc, mppvideodec, mppjpegdec (JeffyCN gstreamer-rockchip), gebaut gegen MPP 1.1.0; Bau: `build/box-media.sh gst` | wie MPP, Laufzeit-Test 0 Fehler |
 | `irl4you-wifi-aic8800` | WLAN-USB-Treiber shenmintao/aic8800d80, Zweig legacy-mcu1 (AIC8800D80/DC/DW, z. B. UGREEN AX900 a69c:5723) mit Firmware für Kernel 6.1.172-irl4you; ersetzt `irl4you-aic8800` | Suchen, Verbinden (2,4/5 GHz), Hotspot (AP); Umschalten vom USB-Laufwerk-Modus macht `pipbox-wlandriver` |
 | `irl4you-wifi-rtw88` | WLAN-USB-Treiber lwfinger/rtw88 (RTL8811CU u. a.) für Kernel 6.1.172-irl4you | Suchen, Verbinden (5 GHz), Hotspot (AP) auf der Box |
+| `irl4you-wifi-rtl8188eus` | WLAN-USB-Treiber aircrack-ng/rtl8188eus, Zweig v5.3.9 (RTL8188EUS, z. B. 0bda:8179, nur 2,4 GHz) für Kernel 6.1.172-irl4you | Suchen, Hotspot (AP) mit WPA2 auf der Box (PMF aus) |
 
 Der WLAN-Treiber gehört zu genau einem Kernel (Version im Namen). Bei einem neuen Kernel wird er neu gebaut.

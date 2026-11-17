@@ -1,6 +1,6 @@
 #!/bin/bash
 # Läuft AUF der Box (26.04): baut eigene Pakete direkt im Bauordner /var/tmp/irl4you-build und legt die .deb in $B/debs.
-# Nichts davon wird ins System installiert. Aufruf: box-build.sh <encoder|srtla|srs|pbpip|rtw88|aic8800|alle>
+# Nichts davon wird ins System installiert. Aufruf: box-build.sh <encoder|srtla|srs|pbpip|rtw88|aic8800|rtl8188eus|alle>
 # Reihenfolge der Auslieferung: bauen -> testen -> .deb nach irl4you/debs/ committen -> per irl4you-update installieren.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)   # vor dem cd merken: Aufruf mit relativem Pfad bleibt gueltig
@@ -89,7 +89,8 @@ case "${1:-alle}" in
     pbpip)   build_pbpip ;;
     rtw88)   bash "$HERE/10-rtw88.sh" ;;
     aic8800) bash "$HERE/11-aic8800.sh" ;;
+    rtl8188eus) bash "$HERE/12-rtl8188eus.sh" ;;
     alle)    build_srtla; build_encoder; build_srs; build_pbpip ;;
-    *) echo "Aufruf: $0 encoder|srtla|srs|pbpip|rtw88|aic8800|alle"; exit 2 ;;
+    *) echo "Aufruf: $0 encoder|srtla|srs|pbpip|rtw88|aic8800|rtl8188eus|alle"; exit 2 ;;
 esac
 log "fertig"
