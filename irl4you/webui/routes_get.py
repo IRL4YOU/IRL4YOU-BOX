@@ -15,7 +15,8 @@ from .netstate import uplink_states
 from .webfiles import static_file
 
 ICONS = {"/favicon.svg": ("favicon.svg", "image/svg+xml"), "/favicon.ico": ("favicon.ico", "image/x-icon"),
-         "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png")}
+         "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
+         "/logo-box.svg": ("favicon.svg", "image/svg+xml"), "/logo-link.svg": ("logo-link.svg", "image/svg+xml")}
 
 
 PHONE_FRAME = """<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IRL4YOU BOX</title>
