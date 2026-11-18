@@ -125,6 +125,25 @@ class TestStreamLinkHandys(unittest.TestCase):
             names.set("link:0102030405060708", "")
             self.assertEqual(names.link_names(), {}, "leerer Name setzt zurück")
 
+    def test_name_aus_der_app_ist_nur_vorgabe(self):
+        import json, os
+        with tempfile.TemporaryDirectory() as d:
+            st = os.path.join(d, "status.json")
+            with open(st, "w") as f:
+                json.dump({"helpers": [{"id": "0102030405060708", "state": "up", "app_name": "OnePlus 13"},
+                                       {"id": "1112131415161718", "state": "up", "app_name": "Pixel"}]}, f)
+            ls = irl("webui.link").LinkStore(d)
+            ls.STATUS = st
+            ls.data["enabled"] = True
+            names = irl("webui.cameras").DeviceNames(d)
+            ls.names = names
+            names.set("link:1112131415161718", "Rucksack")
+            hs = {h["id"]: h for h in ls.status()["helpers"]}
+            self.assertEqual(hs["0102030405060708"]["app_name"], "OnePlus 13")
+            self.assertNotIn("name", hs["0102030405060708"], "App-Name ist kein eigener Name")
+            self.assertEqual(hs["1112131415161718"]["name"], "Rucksack", "Box-Name bleibt neben dem App-Namen")
+            self.assertEqual(hs["1112131415161718"]["app_name"], "Pixel")
+
     def test_bis_zu_acht_handys(self):
         for rel, need in (("pipbox-link.py", "MAX_HELPERS = 8"), ("pipbox_send.py", "LINK_RX.match(r)][:8]"), (os.path.join("webui", "link.py"), "MAX_HELPERS = 8")):
             self.assertIn(need, _read(os.path.join(IRL, rel)), rel)
