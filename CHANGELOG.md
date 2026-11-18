@@ -15,6 +15,7 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - Die Ampel in der Kopfzeile (Alles okay, Warnung, Problem) ist wieder da.
 - Stream Link: Ein Blitz zeigt, dass ein Handy lädt (braucht die neue App-Version). Die Handys haben eigene Namen (Stift) und stehen auch auf der Live-Seite.
 - Netzwerk: eth0 und eth1 (und die WLAN-Karten) behalten ihre Namen nach jedem Neustart; vertauschte Namen werden beim Start vor dem Netzwerk zurückgetauscht.
+- Stream Link: Der Name, den ein Handy in der App einstellt, wird als Vorgabe angezeigt; ein in der Box vergebener Name gilt weiter.
 - Mobcam: iPhone mit Moblin per USB-Kabel als Kamera (Kameras > HDMI und USB > Quelle „Mobcam“), Bild und Ton gehen unverändert durch (H.264 oder H.265, kaum Rechenzeit); Ströme über 12 Mbit/s werden abgelehnt, in Moblin höchstens 10 Mbit/s einstellen.
 - IRL4YOU Cam: Android-Handy mit der App „IRL4YOU Cam“ per USB-Kabel als Kamera (Kameras > HDMI und USB > Quelle „IRL4YOU Cam“), ohne Netzwerk und ohne USB-Debugging; Bild und Ton gehen unverändert durch, die Box stellt die Bitrate auf höchstens 10 Mbit/s.
 - Live: Kachel „Handy“ mit Akku, Strom, Temperatur und Akkukurve des Android-Handys, solange es per USB mit der IRL4YOU Cam sendet (Strom grün beim Laden, orange wenn der Akku sinkt); die Kennzahlen-Karten sind alle gleich groß.
