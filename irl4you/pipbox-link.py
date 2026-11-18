@@ -75,10 +75,25 @@ def open_message(password, salt, host, port):
     return message(OPEN, salt + struct.pack(">HB", port, len(h)) + h + mac(password, salt, host, port))
 
 
+MAX_NAME_BYTES = 32
+
+
+def parse_app_name(rest):
+    """Name des Handys aus dem Rest der CHALLENGE: 1 Byte Länge + UTF-8. Alles Unpassende gibt None (dann gilt kein Name)."""
+    if len(rest) < 1 or not 1 <= rest[0] <= MAX_NAME_BYTES or len(rest) < 1 + rest[0]:
+        return None
+    try:
+        name = rest[1:1 + rest[0]].decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    name = "".join(c for c in name if c.isprintable()).strip()
+    return name or None
+
+
 def parse_challenge(data):
     if len(data) < 16:
         return None
-    return data[:16], data[16:24]
+    return data[:16], data[16:24], parse_app_name(data[24:]) if len(data) >= 24 else None
 
 
 def parse_ok(data):
@@ -177,11 +192,14 @@ class Helper:
         self.t_ping = self.t_pong = 0.0
         self.battery, self.mobile, self.up, self.down = None, None, 0, 0
         self.charging = False
+        self.app_name = None        # Name, den die App selbst meldet (nur Vorgabe)
         self.err = None
         self.t_err = 0.0
 
     def public(self):
         d = {"id": self.hid.hex(), "ip": self.ip, "iface": self.iface, "state": self.state}
+        if self.app_name:
+            d["app_name"] = self.app_name
         if self.state == "up":
             d.update({"battery": self.battery, "charging": self.charging, "mobile": self.mobile, "mb_up": round(self.up / 1e6, 1),
                       "mb_down": round(self.down / 1e6, 1)})
@@ -272,7 +290,7 @@ class Linker:
             except OSError:
                 pass
 
-    def send_open(self, name, addr, salt, hid):
+    def send_open(self, name, addr, salt, hid, app_name=None):
         s = self.socks.get(name)
         if not s or not self.target:
             return
@@ -285,6 +303,8 @@ class Linker:
         if h is None:
             h = self.helpers[hid] = Helper(hid, addr[0], addr[1], name)
         h.state, h.t_open, h.err = "opening", time.monotonic(), None
+        if app_name:
+            h.app_name = app_name
 
     # -- Empfangen --
     def handle(self, name, addr, buf, now):
@@ -296,7 +316,7 @@ class Linker:
             c = parse_challenge(data)
             if not c or not self.target:
                 return
-            salt, hid = c
+            salt, hid, app_name = c
             h = self.helpers.get(hid)
             if h is not None:
                 # Gilt nur die jüngste Zufallszahl des Hilfshandys: bei "opening" mit ihr noch einmal anmelden
@@ -304,7 +324,7 @@ class Linker:
                     return
             elif len(self.helpers) >= MAX_HELPERS:
                 return
-            self.send_open(name, addr, salt, hid)
+            self.send_open(name, addr, salt, hid, app_name)
             return
         h = next((x for x in self.helpers.values() if x.iface == name and x.ip == addr[0]), None)
         if h is None:

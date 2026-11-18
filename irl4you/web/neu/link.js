@@ -18,11 +18,11 @@
     }
   }
 
-  /* Verbundene Handys, nach Kennung sortiert: eigener Name oder „Handy 1“, „Handy 2“ … */
+  /* Verbundene Handys, nach Kennung sortiert: eigener Name, Name aus der App oder „Handy 1“, „Handy 2“ … */
   Neu.linkPhones = () => {
     const d = App.data.link, hs = d && d.enabled ? (d.helpers || []).filter(x => x.state === 'up').slice().sort((a, b) => String(a.id).localeCompare(String(b.id))) : [];
     rates(hs);
-    return hs.map((x, i) => ({ ...x, label: x.name || `Handy ${i + 1}`, custom: x.name || '', rate: rate[x.id] || null }));
+    return hs.map((x, i) => ({ ...x, label: x.name || x.app_name || `Handy ${i + 1}`, custom: x.name || '', rate: rate[x.id] || null }));
   };
 
   /* Akku in Prozent, bei „lädt“ mit kleinem Blitz davor (die App meldet es im Akku-Byte mit) */

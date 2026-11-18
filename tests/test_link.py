@@ -51,15 +51,52 @@ class TestPongAkku(unittest.TestCase):
             self.assertEqual((p["battery"], p["charging"]), (None, False), b)
 
 
+class TestAppName(unittest.TestCase):
+    """Name aus der CHALLENGE: 1 Byte Länge + UTF-8, höchstens 32 Byte; alles Unpassende gilt als kein Name."""
+
+    def parse(self, rest):
+        m = load(tempfile.mkdtemp(), 18391)
+        return m.parse_challenge(b"s" * 16 + b"\x01" * 8 + rest)
+
+    def test_name_wird_gelesen(self):
+        n = "OnePlus 13".encode()
+        self.assertEqual(self.parse(bytes([len(n)]) + n)[2], "OnePlus 13")
+        n = "Müller-Handy".encode()
+        self.assertEqual(self.parse(bytes([len(n)]) + n)[2], "Müller-Handy")
+
+    def test_alte_app_ohne_name(self):
+        self.assertIsNone(self.parse(b"")[2])
+        m = load(tempfile.mkdtemp(), 18391)
+        self.assertEqual(m.parse_challenge(b"s" * 16 + b"\x01" * 8), (b"s" * 16, b"\x01" * 8, None))
+
+    def test_unpassendes_wird_ignoriert(self):
+        self.assertIsNone(self.parse(b"\x00")[2])                      # Länge 0
+        self.assertIsNone(self.parse(b"\x21" + b"a" * 33)[2])          # über 32 Byte
+        self.assertIsNone(self.parse(b"\x05ab")[2])                    # Paket zu kurz
+        self.assertIsNone(self.parse(b"\x02\xff\xfe")[2])              # kein UTF-8
+        self.assertIsNone(self.parse(b"\x03\x01\x02\x03")[2])          # nur Steuerzeichen
+        self.assertIsNone(self.parse(b"\x02  ")[2])                    # nur Leerzeichen
+
+    def test_steuerzeichen_werden_entfernt(self):
+        self.assertEqual(self.parse(b"\x06a\nb\x00c\x07")[2], "abc")
+
+    def test_laenge_zaehlt_bytes_nicht_zeichen(self):
+        n = ("ä" * 16).encode()                                        # 32 Byte
+        self.assertEqual(self.parse(bytes([len(n)]) + n)[2], "ä" * 16)
+        n = ("ä" * 17).encode()                                        # 34 Byte
+        self.assertIsNone(self.parse(bytes([len(n)]) + n)[2])
+
+
 class FakePhone:
     """Gegenstelle wie die App: HELLO -> CHALLENGE, OPEN prüfen -> OK/ERR, PING -> PONG."""
 
-    def __init__(self, password="geheim", battery=77, mobile=True):
+    def __init__(self, password="geheim", battery=77, mobile=True, app_name=None):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(("127.0.0.1", 0))
         self.sock.settimeout(0.1)
         self.port = self.sock.getsockname()[1]
         self.password, self.battery, self.mobile = password, battery, mobile
+        self.app_name = app_name     # Rohbytes oder Text; wird an die CHALLENGE gehängt
         self.ident = b"\x01\x02\x03\x04\x05\x06\x07\x08"
         self.salts = {}
         self.opens = []
@@ -88,7 +125,9 @@ class FakePhone:
             if kind == 1:
                 salt = os.urandom(16)
                 self.salts[addr] = salt
-                self._send(2, salt + self.ident, addr)
+                extra = self.app_name if isinstance(self.app_name, bytes) else (
+                    bytes([len(self.app_name.encode())]) + self.app_name.encode() if self.app_name else b"")
+                self._send(2, salt + self.ident + extra, addr)
             elif kind == 3:
                 salt = self.salts.pop(addr, None)
                 s, port, n = data[:16], *struct.unpack(">HB", data[16:19])
@@ -202,6 +241,20 @@ class TestSession(Base):
         self.assertEqual((h["state"], h["battery"], h["mobile"]), ("up", 77, True))
         self.assertEqual((h["mb_up"], h["mb_down"]), (5.0, 2.0))
         self.assertFalse(st["searching"])
+
+    def test_app_name_kommt_in_den_status(self):
+        self.phone.app_name = "OnePlus 13"
+        self.assertTrue(self.run_for(3, lambda: self.status()["helpers"] and self.status()["helpers"][0].get("state") == "up"))
+        self.assertEqual(self.status()["helpers"][0]["app_name"], "OnePlus 13")
+
+    def test_ohne_app_name_kein_feld(self):
+        self.assertTrue(self.run_for(3, lambda: self.status()["helpers"] and self.status()["helpers"][0].get("state") == "up"))
+        self.assertNotIn("app_name", self.status()["helpers"][0])
+
+    def test_kaputter_app_name_stoert_die_verbindung_nicht(self):
+        self.phone.app_name = b"\x09\xff\xfe"
+        self.assertTrue(self.run_for(3, lambda: self.links()))
+        self.assertNotIn("app_name", self.status()["helpers"][0])
 
     def test_pings_keep_the_session_open(self):
         self.run_for(3, lambda: self.links())
