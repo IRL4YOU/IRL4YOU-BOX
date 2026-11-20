@@ -17,6 +17,7 @@ STATUS = f"{RUN}/status.json"
 LOCK = "/run/pipbox-wlandriver.lock"
 SYSFS_USB = "/sys/bus/usb/devices"
 SYSFS_NET = "/sys/class/net"
+USBDEVFS_RESET = 0x5514  # _IO('U', 20)
 PKG = "irl4you-wifi-aic8800"
 MODULES = ("aic_load_fw", "aic8800_fdrv")
 NAME = "AIC8800-WLAN-Stick"
@@ -120,15 +121,85 @@ def switch_cmd(ident):
     return ["usb_modeswitch", "-KW", "-v", ident.split(":")[0], "-p", ident.split(":")[1]]
 
 
-def switch_mode(ident, present=usb_ids_present, run_cmd=run, sleep=time.sleep, now=time.time, timeout=20):
-    r = run_cmd(switch_cmd(ident), timeout=30)
-    end = now() + timeout
-    while ident in present():
-        if now() >= end:
-            last = [x.strip() for x in (r.stdout + r.stderr).splitlines() if x.strip()]
-            return (last[-1] if last else "keine Antwort")[:80]
-        sleep(1)
-    return ""
+def usb_find(ident, root=SYSFS_USB):
+    """(Verzeichnisname, Gerätedatei /dev/bus/usb/BBB/DDD) des ersten USB-Geräts mit dieser Kennung, sonst ("", "")."""
+    vid, pid = ident.split(":")
+    try:
+        names = sorted(os.listdir(root))
+    except OSError:
+        return "", ""
+    for n in names:
+        if ":" in n:
+            continue
+        try:
+            with open(f"{root}/{n}/idVendor") as f:
+                v = f.read().strip().lower()
+            with open(f"{root}/{n}/idProduct") as f:
+                p = f.read().strip().lower()
+            if (v, p) != (vid, pid):
+                continue
+            with open(f"{root}/{n}/busnum") as f:
+                bus = int(f.read().strip())
+            with open(f"{root}/{n}/devnum") as f:
+                dev = int(f.read().strip())
+        except (OSError, ValueError):
+            continue
+        return n, f"/dev/bus/usb/{bus:03d}/{dev:03d}"
+    return "", ""
+
+
+def usb_reset(ident, root=SYSFS_USB, opener=os.open, ioctl=fcntl.ioctl, sleep=time.sleep):
+    """Setzt das USB-Gerät zurück. Manche Sticks hängen nach dem ersten Anstecken im Laufwerk-Modus fest (kein Laufwerk, keine Antwort)
+    und nehmen den Umschaltbefehl erst nach einem vollständigen Abmelden und Anmelden an (wie Aus- und Wiedereinstecken):
+    sysfs "authorized" 0 und 1. Ein bloßer Port-Reset (ioctl) hilft dabei nicht, bleibt aber als Rückfall."""
+    name, node = usb_find(ident, root)
+    if not name:
+        return False
+    try:
+        with open(f"{root}/{name}/authorized", "w") as f:
+            f.write("0")
+        sleep(2)
+        with open(f"{root}/{name}/authorized", "w") as f:
+            f.write("1")
+        return True
+    except OSError:
+        pass
+    try:
+        fd = opener(node, os.O_WRONLY)
+    except OSError:
+        return False
+    try:
+        ioctl(fd, USBDEVFS_RESET, 0)
+    except OSError:
+        return False
+    finally:
+        os.close(fd)
+    return True
+
+
+def switch_mode(ident, present=usb_ids_present, run_cmd=run, sleep=time.sleep, now=time.time, timeout=20, reset=usb_reset, tries=2):
+    """Schaltet den Stick um. Klappt es nicht, wird er zurückgesetzt und es wird erneut versucht (insgesamt `tries` Versuche)."""
+    err = ""
+    for attempt in range(tries):
+        if attempt:
+            log(f"Umschalten erfolglos ({err}); Stick wird zurückgesetzt, Versuch {attempt + 1}")
+            if ident not in present():
+                return ""
+            reset(ident)
+            sleep(5)
+            if ident not in present():
+                return ""
+        r = run_cmd(switch_cmd(ident), timeout=30)
+        end = now() + timeout
+        while ident in present():
+            if now() >= end:
+                last = [x.strip() for x in (r.stdout + r.stderr).splitlines() if x.strip()]
+                err = (last[-1] if last else "keine Antwort")[:80]
+                break
+            sleep(1)
+        else:
+            return ""
+    return err
 
 
 def do_auto():
