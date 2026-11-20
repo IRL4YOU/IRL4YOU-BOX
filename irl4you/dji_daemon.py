@@ -323,7 +323,8 @@ def preferred_adapter():
         names = [n for n in os.listdir(dji.SYSFS_BT) if re.fullmatch(r"hci\d+", n)]
     except OSError:
         return None
-    names = [n for n in names if dji.usb_id_for_hci(n) not in dji.WLAN_ONLY_IDS]
+    eigene = [n for n in names if dji.usb_id_for_hci(n) not in dji.WLAN_ONLY_IDS]
+    names = eigene or names     # Bluetooth eines WLAN-Sticks (AIC8800) nur, wenn es sonst keinen Adapter gibt
     if not names:
         return None
     names.sort(key=lambda n: (dji.usb_id_for_hci(n) == ONBOARD_USB_ID, int(n[3:])))

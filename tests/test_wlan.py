@@ -32,13 +32,27 @@ class TestAicKeinBluetooth(unittest.TestCase):
             ids = [d["id"] for d in dji.usb_bluetooth_devices(root)]
         self.assertEqual(ids, ["2357:0604"])
 
-    def test_wlan_stick_nicht_als_adapter(self):
+    def test_wlan_stick_steht_als_adapter_in_der_liste(self):
         dji = irl("dji")
-        objs = {"/org/bluez/hci2": {"org.bluez.Adapter1": {"Address": "AA:BB:CC:00:00:01", "Powered": False}}}
+        objs = {"/org/bluez/hci2": {"org.bluez.Adapter1": {"Address": "AA:BB:CC:00:00:01", "Powered": True}}}
         with mock.patch.object(dji, "usb_info_for_hci", return_value={"usb_id": "a69c:8d81", "name": "AIC 8800D80", "vendor": "AICSemi"}):
-            self.assertEqual(dji.adapter_info(objs)["adapters"], [])
+            info = dji.adapter_info(objs)
+        self.assertEqual([a["usb_id"] for a in info["adapters"]], ["a69c:8d81"])
+        self.assertEqual(info["adapter_problems"], [])
         with mock.patch.object(dji, "usb_info_for_hci", return_value={"usb_id": "2357:0604", "name": "UB500", "vendor": "TP-Link"}):
             self.assertEqual(len(dji.adapter_info(objs)["adapters"]), 1)
+
+    def test_dji_nimmt_den_wlan_stick_nur_als_notloesung(self):
+        daemon = irl("dji_daemon")
+        ids = {"hci0": "13d3:3572", "hci1": "a69c:8d81"}
+        with mock.patch.object(daemon.os, "listdir", return_value=["hci0", "hci1"]), \
+                mock.patch.object(daemon.dji, "usb_id_for_hci", side_effect=lambda n: ids[n]):
+            self.assertEqual(daemon.preferred_adapter(), "hci0")
+        with mock.patch.object(daemon.os, "listdir", return_value=["hci1"]), \
+                mock.patch.object(daemon.dji, "usb_id_for_hci", side_effect=lambda n: ids[n]):
+            self.assertEqual(daemon.preferred_adapter(), "hci1")
+        with mock.patch.object(daemon.os, "listdir", return_value=[]):
+            self.assertIsNone(daemon.preferred_adapter())
 
 
 class TestGespeicherteNetze(unittest.TestCase):

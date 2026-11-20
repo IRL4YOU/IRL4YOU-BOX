@@ -9,7 +9,8 @@ SYSFS_BT = "/sys/class/bluetooth"
 SYSFS_NET = "/sys/class/net"
 BTDRIVER_STATUS = "/run/pipbox-btdriver/status.json"
 BARROT_VENDOR = "33fa"
-# Reine WLAN-Sticks (AIC8800D80): ihr Treiber legt zwar einen Bluetooth-Eintrag an, sie sind aber kein Bluetooth-Stick und gehören nicht in die Bluetooth-Listen
+# WLAN-Sticks mit AIC8800D80: ihr Treiber legt einen Bluetooth-Adapter an. Er steht in der Adapterliste, die DJI-Anbindung nimmt ihn aber nur, wenn es keinen anderen gibt;
+# bei fehlendem Adapter (adapter_problems) zählen sie nicht als Bluetooth-Stick
 WLAN_ONLY_IDS = ("a69c:8d80", "a69c:8d81", "368b:8d80", "368b:8d81")
 BARROT_HINT = ("Dieser Stick hat einen BARROT-Chip (zum Beispiel UGREEN Bluetooth 5.4 oder 6.0). Der Kernel dieser IRL4YOU Box startet ihn nicht von allein. "
                "Die Box richtet dafür beim Einstecken selbst einen Treiber ein (dauert wenige Minuten, nie während einer Übertragung). "
@@ -196,11 +197,9 @@ def adapter_info(objects=None):
         mid = usb_id_from_modalias(a.get("Modalias"))
         info = usb_info_for_hci(os.path.basename(str(path)))
         uid = info.get("usb_id") or ("" if mid.startswith("1d6b:") else mid)
-        if uid in WLAN_ONLY_IDS:
-            continue
         adapters.append({"usb_id": uid, "name": info.get("name", ""), "vendor": info.get("vendor", ""),
                          "address": str(a.get("Address", "")), "powered": bool(a.get("Powered", False))})
-        if uid:
+        if uid and uid not in WLAN_ONLY_IDS:
             ids.append(uid)
     drv = {}
     try:
