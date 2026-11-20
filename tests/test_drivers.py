@@ -58,9 +58,74 @@ class Wlan(unittest.TestCase):
             stdout, stderr = "", "fehler"
         seen = iter([{"a69c:5723"}, set()])
         self.assertEqual(self.m.switch_mode("a69c:5723", present=lambda: next(seen), run_cmd=lambda *a, **k: R(), sleep=lambda s: None), "")
-        t = iter(range(0, 100, 10))
-        err = self.m.switch_mode("a69c:5723", present=lambda: {"a69c:5723"}, run_cmd=lambda *a, **k: R(), sleep=lambda s: None, now=lambda: next(t))
+        t = iter(range(0, 1000, 10))
+        resets = []
+        err = self.m.switch_mode("a69c:5723", present=lambda: {"a69c:5723"}, run_cmd=lambda *a, **k: R(), sleep=lambda s: None, now=lambda: next(t),
+                                 reset=resets.append)
         self.assertEqual(err, "fehler")
+        self.assertEqual(resets, ["a69c:5723"])
+
+    def test_umschalten_setzt_den_stick_zurueck_und_versucht_es_erneut(self):
+        class R:
+            stdout, stderr = "", "Device is gone"
+        calls, resets = [], []
+
+        def run_cmd(cmd, timeout=0):
+            calls.append(cmd)
+            return R()
+
+        # nach dem Zurücksetzen und dem zweiten Befehl verschwindet der Laufwerk-Modus
+        def present():
+            return set() if len(calls) >= 2 else {"a69c:5723"}
+
+        t = iter(range(0, 1000, 10))
+        self.assertEqual(self.m.switch_mode("a69c:5723", present=present, run_cmd=run_cmd, sleep=lambda s: None, now=lambda: next(t), reset=resets.append), "")
+        self.assertEqual(resets, ["a69c:5723"])
+        self.assertEqual(len(calls), 2)
+
+    def test_umschalten_ohne_zuruecksetzen_wenn_gleich_geklappt(self):
+        class R:
+            stdout, stderr = "", ""
+        resets = []
+        seen = iter([{"a69c:5723"}, set()])
+        self.assertEqual(self.m.switch_mode("a69c:5723", present=lambda: next(seen), run_cmd=lambda *a, **k: R(), sleep=lambda s: None, reset=resets.append), "")
+        self.assertEqual(resets, [])
+
+    def test_usb_reset_meldet_ab_und_wieder_an(self):
+        usb(self.root, "4-1.1", "a69c", "5723")
+        put(f"{self.root}/4-1.1/busnum", "4\n")
+        put(f"{self.root}/4-1.1/devnum", "4\n")
+        put(f"{self.root}/4-1.1/authorized", "1")
+        self.assertEqual(self.m.usb_find("a69c:5723", self.root), ("4-1.1", "/dev/bus/usb/004/004"))
+        self.assertEqual(self.m.usb_find("0bda:c811", self.root), ("", ""))
+        schritte = []
+
+        def sleep(s):
+            with open(f"{self.root}/4-1.1/authorized") as f:
+                schritte.append(f.read())
+
+        self.assertTrue(self.m.usb_reset("a69c:5723", self.root, sleep=sleep))
+        self.assertEqual(schritte, ["0"])
+        with open(f"{self.root}/4-1.1/authorized") as f:
+            self.assertEqual(f.read(), "1")
+        self.assertFalse(self.m.usb_reset("0bda:c811", self.root))
+
+    def test_usb_reset_faellt_auf_port_reset_zurueck(self):
+        usb(self.root, "4-1.1", "a69c", "5723")
+        put(f"{self.root}/4-1.1/busnum", "4\n")
+        put(f"{self.root}/4-1.1/devnum", "4\n")
+        os.makedirs(f"{self.root}/4-1.1/authorized")  # Schreiben schlägt fehl
+        got, closed = [], []
+        orig_close = os.close
+        os.close = lambda fd: closed.append(fd)
+        try:
+            ok = self.m.usb_reset("a69c:5723", self.root, opener=lambda path, flags: got.append(path) or 77,
+                                  ioctl=lambda fd, req, arg: got.append((fd, req)), sleep=lambda s: None)
+        finally:
+            os.close = orig_close
+        self.assertTrue(ok)
+        self.assertEqual(got, ["/dev/bus/usb/004/004", (77, 0x5514)])
+        self.assertEqual(closed, [77])
 
     def test_schnittstelle_zum_stick(self):
         usb(self.root, "usb/1-1.4", "a69c", "8d81")
