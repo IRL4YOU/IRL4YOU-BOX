@@ -8,6 +8,7 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - Kameras: Die gewählte Verbindung wird richtig zugeordnet.
 - Zusätzlicher WLAN-Stick wird unterstützt (Treiberpaket).
 - WLAN-Stick mit AIC8800 (z. B. UGREEN AX900): Hängt er nach dem Anstecken im Laufwerk-Modus fest, wird er zurückgesetzt und noch einmal umgeschaltet.
+- Bluetooth: Der Bluetooth-Adapter eines WLAN-Sticks mit AIC8800 steht jetzt in der Adapterliste; für DJI-Kameras wird er nur genutzt, wenn es keinen anderen gibt.
 - Stream Link: Handys mit der App „IRL4YOU Stream Link“ senden als zusätzliche Sendewege mit, bis zu 8 (Netzwerk > Stream Link).
 - Kameras: Die Kamera „HDMI und USB“ steht unter „Quellen“ nur, solange sie eingeschaltet ist.
 - Neues Logo für die Box (Würfel in der Plakette) und das Stream-Link-Logo an der Stream-Link-Karte.
