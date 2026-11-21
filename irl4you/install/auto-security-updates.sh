@@ -1,5 +1,5 @@
 #!/bin/sh
-# Ubuntu-Systemupdates (Sicherheit und normale Korrekturen) laufen NUR mit einem IRL4YOU-Update (Commit auf main):
+# Ubuntu-Systemupdates (Sicherheit und normale Korrekturen, dazu Tailscale) laufen NUR mit einem IRL4YOU-Update (Commit auf main):
 # kein eigener Zeitplan auf der Box, denn der Updater startet nie waehrend einer Uebertragung. Nie automatischer
 # Neustart, niedrige Prioritaet. Betrifft ein Update Systemteile, die erst nach einem Neustart wirken, steht
 # /run/reboot-required (wie bei Ubuntu); die Oberflaeche zeigt dann einen Hinweis mit Knopf "Neu starten".
@@ -13,6 +13,8 @@ cat > /etc/apt/apt.conf.d/52irl4you-unattended <<'CONF'
 // IRL4YOU Box: Ubuntu-Updates nur mit einem IRL4YOU-Update, kein automatischer Neustart
 Unattended-Upgrade::Allowed-Origins:: "${distro_id}:${distro_codename}-security";
 Unattended-Upgrade::Allowed-Origins:: "${distro_id}:${distro_codename}-updates";
+// Tailscale kommt aus der eigenen Quelle von Tailscale (kein Suite-Feld, darum als Muster); Sicherheitskorrekturen sollen nicht liegen bleiben
+Unattended-Upgrade::Origins-Pattern:: "origin=Tailscale";
 Unattended-Upgrade::Allowed-Origins:: "${distro_id}ESMApps:${distro_codename}-apps-security";
 Unattended-Upgrade::Allowed-Origins:: "${distro_id}ESM:${distro_codename}-infra-security";
 Unattended-Upgrade::Automatic-Reboot "false";
