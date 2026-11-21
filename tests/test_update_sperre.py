@@ -197,6 +197,7 @@ class TestSystemupdatesMitUpdate(unittest.TestCase):
         sh = self.lesen("irl4you", "install", "auto-security-updates.sh")
         self.assertIn("${distro_codename}-updates", sh)
         self.assertIn("${distro_codename}-security", sh)
+        self.assertIn('Origins-Pattern:: "origin=Tailscale"', sh)                  # Tailscale aus der eigenen Quelle
         self.assertIn('Automatic-Reboot "false"', sh)
         self.assertIn('Unattended-Upgrade "0"', sh)                         # weiterhin kein eigener Zeitplan
         self.assertIn("/run/reboot-required", sh)
