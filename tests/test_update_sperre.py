@@ -172,6 +172,74 @@ class TestOberflaecheUpdates(Basis):
         c.assert_called_once_with(True)
 
 
+    def test_neustart_hinweis_nur_mit_marke(self):
+        marke = os.path.join(self.d.name, "reboot-required")
+        self.up.REBOOT_FLAG = marke
+        self.assertEqual(self.up.reboot_needed(), (False, []))             # keine Marke: kein Hinweis
+        open(marke, "w").write("*** System restart required ***\n")
+        self.assertEqual(self.up.reboot_needed(), (True, []))              # Marke ohne Paketliste genügt
+        open(marke + ".pkgs", "w").write("systemd\nudev\n$(boese)\n")
+        self.assertEqual(self.up.reboot_needed(), (True, ["systemd", "udev"]))   # nur gültige Paketnamen
+        self.up.demo = True
+        self.assertEqual(self.up.reboot_needed(), (False, []))
+
+
+class TestSystemupdatesMitUpdate(unittest.TestCase):
+    """Ubuntu-Updates laufen nur im Installationsschritt eines IRL4YOU-Updates; Neustart-Marke wie bei Ubuntu, Knopf in der Oberfläche."""
+
+    ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def lesen(self, *teile):
+        with open(os.path.join(self.ROOT, *teile), encoding="utf-8") as f:
+            return f.read()
+
+    def test_skript_nimmt_normale_updates_mit_und_startet_nie_selbst_neu(self):
+        sh = self.lesen("irl4you", "install", "auto-security-updates.sh")
+        self.assertIn("${distro_codename}-updates", sh)
+        self.assertIn("${distro_codename}-security", sh)
+        self.assertIn('Automatic-Reboot "false"', sh)
+        self.assertIn('Unattended-Upgrade "0"', sh)                         # weiterhin kein eigener Zeitplan
+        self.assertIn("/run/reboot-required", sh)
+        self.assertNotIn("systemctl reboot", sh)
+        self.assertNotIn("shutdown", sh)
+
+    def test_skript_setzt_marke_nur_bei_geaenderten_systempaketen(self):
+        import subprocess
+        sh = self.lesen("irl4you", "install", "auto-security-updates.sh")
+        a = sh.index("BOOT_PKGS=")
+        b = sh.index('echo "auto-security-updates: geprueft')
+        teil = sh[a:b]
+        with tempfile.TemporaryDirectory() as d:
+            bin_ = os.path.join(d, "bin")
+            os.mkdir(bin_)
+            stand = os.path.join(d, "stand")
+            for name, body in (("dpkg-query", 'cat "%s"\n' % stand), ("apt-get", "exit 0\n"), ("unattended-upgrade", 'echo "$NEU" > "%s"\n' % stand), ("nice", 'shift; shift; exec "$@"\n'), ("ionice", 'shift; exec "$@"\n')):
+                with open(os.path.join(bin_, name), "w") as f:
+                    f.write("#!/bin/sh\n" + body)
+                os.chmod(os.path.join(bin_, name), 0o755)
+            skript = teil.replace("/run/", d + "/").replace("/var/log/", d + "/")
+            def lauf(vorher, nachher):
+                for suf in ("", ".pkgs"):
+                    if os.path.exists(os.path.join(d, "reboot-required" + suf)):
+                        os.remove(os.path.join(d, "reboot-required" + suf))
+                open(stand, "w").write(vorher)
+                subprocess.run(["sh", "-c", skript], env={"PATH": bin_ + ":/usr/bin:/bin", "NEU": nachher.rstrip("\n")}, check=True)
+                return os.path.exists(os.path.join(d, "reboot-required"))
+            alt = "dbus 1.1\nsystemd 259.5\nudev 259.5\n"
+            self.assertFalse(lauf(alt, alt))                                   # nichts geändert: keine Marke
+            self.assertTrue(lauf(alt, alt.replace("259.5", "259.9")))          # systemd/udev neu: Marke
+            with open(os.path.join(d, "reboot-required.pkgs")) as f:
+                self.assertEqual(f.read().split(), ["systemd", "udev"])
+
+    def test_oberflaeche_zeigt_hinweis_und_knopf(self):
+        js = self.lesen("irl4you", "web", "neu", "views", "system.js")
+        self.assertIn("d.reboot_needed && !busy ? rebootNote(d)", js)
+        self.assertIn("badge('Neustart nötig', 'warn')", js)
+        self.assertIn("btn('Jetzt neu starten'", js)
+        self.assertIn("disabled: !!d.sending", js)                           # nie während der Sendung
+        self.assertIn("'/api/power', { action: 'reboot', confirm: true }", js)
+
+
 class TestDateien(unittest.TestCase):
     def test_einheiten_und_hook(self):
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
