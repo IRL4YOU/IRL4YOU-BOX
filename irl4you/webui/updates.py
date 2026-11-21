@@ -24,6 +24,7 @@ class SwUpdate:
     CURRENT = "/opt/irl4you/current"
     PREVIOUS = "/var/lib/irl4you/previous"
     HELPER = "/usr/local/sbin/irl4you-update"
+    REBOOT_FLAG = "/run/reboot-required"      # legt auto-security-updates.sh an, wenn ein Systemupdate erst nach einem Neustart voll wirkt; weg nach dem Neustart
     ISSUES = "https://github.com/IRL4YOU/IRL4YOU-BOX/issues"
     STAGE = ""
     UPDATER_STATUS_MAX_AGE = 6 * 3600
@@ -274,7 +275,15 @@ class SwUpdate:
         out["versions"] = self.versions({} if self.demo else st)
         out["sending"] = False if self.demo else bool(encoder_running() or self.send._active())
         out["helper_installed"] = self.demo or os.path.exists(self.HELPER)
+        out["reboot_needed"], out["reboot_pkgs"] = self.reboot_needed()
         return out
+
+    def reboot_needed(self):
+        """(True, Paketnamen) solange ein eingespieltes Systemupdate einen Neustart braucht."""
+        if self.demo or not os.path.exists(self.REBOOT_FLAG):
+            return False, []
+        pkgs = [p for p in read(self.REBOOT_FLAG + ".pkgs", "").split() if re.match(r"^[a-z0-9][a-z0-9.+-]{0,60}$", p)]
+        return True, pkgs[:12]
 
     def cancel(self, confirm):
         """Hängendes Update abbrechen: nur in der Vorbereitung und erst, wenn es 5 Minuten stillsteht. Der Helfer-Dienst für den Abbruch beendet es."""
