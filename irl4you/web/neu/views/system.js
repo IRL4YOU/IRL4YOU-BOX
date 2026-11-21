@@ -41,6 +41,16 @@
       if (!swNote && (d.checked_at || 0) === t0) swNote = { t0, text: 'Die Prüfung hat nicht geantwortet. Bitte gleich noch einmal versuchen.' };
       App.set('swupdate', d);       // das Ergebnis steht in der Karte (kein Hinweisfenster unten rechts)
     }
+    /* Systemupdate eingespielt, das erst nach einem Neustart voll wirkt: Hinweis und Knopf (nur wenn nicht gesendet wird) */
+    function rebootNote(d) {
+      const pk = (d.reboot_pkgs || []).join(', ');
+      return h('div', { class: 'stack', style: '--gap:var(--space-2)' }, h('p', { class: 'field__hint', text: 'Ein Systemupdate ist eingespielt und wirkt erst nach einem Neustart der Box.' }), pk ? h('p', { class: 'field__hint', text: pk }) : null,
+        d.sending ? h('p', { class: 'field__hint', text: 'Neu starten geht erst, wenn nicht mehr gesendet wird.' }) : null,
+        h('div', { class: 'cluster' }, btn('Jetzt neu starten', { size: 'sm', variant: 'primary', disabled: !!d.sending, onclick: async () => {
+          if (!await ask({ title: 'Box neu starten?', text: 'Die Box startet neu und ist danach nach etwa einer Minute wieder erreichbar.', ok: 'Neu starten', danger: true })) return;
+          try { await api('POST', '/api/power', { action: 'reboot', confirm: true }); } catch (x) { swMsg.set(x.message, 'bad'); return; }
+          swMsg.set('Die Box startet neu. Diese Seite lädt sich nach etwa einer Minute wieder.', 'ok'); } })));
+    }
     function renderSw() {
       const d = App.data.swupdate; if (!d) return;
       if (swFirst === null) swFirst = d.current; const installing = d.state === 'installing'; if (installing) { swSaw = true; if (!swPending) { swPending = Date.now(); window.pbUpdating = swPending; } }
@@ -49,7 +59,7 @@
       const sg = JSON.stringify([Object.assign({}, d, { checked_at: Math.floor((d.checked_at || 0) / 60) }), swPending, histSecs && 1]);       /* die Prüfzeit steht nur auf die Minute genau da: nicht bei jeder Sekunde neu zeichnen */ if (sg === swSig) return; if (swBox.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; swSig = sg;
       const busy = installing || !!swPending; swVersions = d.versions || []; swCur = d.current; window.swCurVer = d.current;
       document.getElementById('ver').textContent = 'Version ' + d.current + (d.stage ? ' (' + d.stage + ')' : '');
-      swNewer = !!d.newer; navDot();
+      swNewer = !!(d.newer || d.reboot_needed); navDot();
       dl.replaceChildren(...swVersions.filter(v => !v.current).map(v => h('option', { value: v.version }, `${v.version} · ${v.relation}${v.local ? ' · gesichert' : ''}${v.github ? ' · GitHub' : ''}${v.date ? ' · ' + v.date : ''}`)));
       let m = ''; if (!d.helper_installed) m = 'Der Update-Helfer ist nicht installiert. Bitte install.sh einmal erneut ausführen.'; else if (d.error) m = d.error; else if (busy) m = (d.state === 'installing' ? 'Das Update läuft' : 'Update wird gestartet') + ' … Die Seite lädt danach von selbst neu.';
       else if (d.state === 'done' || d.state === 'rolledback' || d.state === 'refused' || d.state === 'failed') m = d.message; else if (d.sending && d.newer) m = 'Update gesperrt: Es wird gerade gesendet.'; else if (d.newer && d.bridge) m = 'Die Testphase ist beendet: Dieses Update führt zurück auf die stabile Version. Installieren geht nur, wenn nicht gesendet wird.'; else if (d.newer) m = 'Eine neue Version ist da. Installieren geht nur, wenn nicht gesendet wird.';
@@ -62,9 +72,9 @@
       const x = () => swVersions.find(v => v.version === verInput.value.trim().replace(/^v/, ''));
       const showInfo = () => { const raw = verInput.value.trim(), v = x(); verInfo.textContent = !raw ? (swVersions.length > 1 ? 'Verfügbar: ' + swVersions.filter(q => !q.current).slice(0, 6).map(q => q.version + (q.relation === 'älter' ? ' (älter)' : ' (neuer)')).join(', ') + '.' : 'Es sind noch keine anderen Versionen gesichert oder veröffentlicht.') : (!v || v.current) ? (v && v.current ? 'Diese Version ist schon installiert.' : 'Diese Version kennt die Box nicht (weder gesichert noch auf GitHub veröffentlicht).') : `Version ${v.version}: ${v.relation}${v.local ? ', lokal gesichert (sofort verfügbar)' : ''}${v.github ? ', auf GitHub veröffentlicht' : ''}${v.date ? ', ' + v.date : ''}.`; }; verInput.oninput = showInfo; showInfo();
       swBox.replaceChildren(card({ title: 'Software-Update (IRL4YOU BOX)', sub: 'Holt neue Versionen dieser Software aus dem Repository auf GitHub. Kameras, Server und Einstellungen bleiben erhalten. Nicht während einer Übertragung.',
-        actions: [busy ? badge('läuft …', 'accent') : d.error ? badge('unbekannt') : d.newer ? badge('Update verfügbar', 'accent') : d.pending ? badge('kommt gleich', 'accent') : d.channel === 'test' ? badge('Testversion', 'warn') : badge('aktuell', 'ok')], body: [
+        actions: [busy ? badge('läuft …', 'accent') : d.reboot_needed ? badge('Neustart nötig', 'warn') : d.error ? badge('unbekannt') : d.newer ? badge('Update verfügbar', 'accent') : d.pending ? badge('kommt gleich', 'accent') : d.channel === 'test' ? badge('Testversion', 'warn') : badge('aktuell', 'ok')], body: [
         kv('Installiert', 'v' + d.current + (d.stage ? ' (' + d.stage + ')' : '')), kv('Neueste auf GitHub', d.latest ? 'v' + (d.latest_version || d.latest) : (d.error ? '–' : 'wird geprüft …')),
-        d.newer && d.notes ? md(d.notes) : null, busy ? prog(d.progress || 0, d.step || 'Update wird gestartet') : null, swMsg,
+        d.newer && d.notes ? md(d.notes) : null, busy ? prog(d.progress || 0, d.step || 'Update wird gestartet') : null, swMsg, d.reboot_needed && !busy ? rebootNote(d) : null,
         h('div', { class: 'cluster' }, btn('Nach Updates suchen', { size: 'sm', ico: 'refresh', disabled: busy, run: swCheck }),
           btn('Update installieren', { size: 'sm', variant: d.newer ? 'primary' : null, disabled: busy || !d.newer || d.sending || !d.helper_installed, onclick: async () => { if (await ask({ title: 'Software-Update installieren?', text: '• Es darf KEINE Übertragung laufen.\n• Die Oberfläche startet dabei kurz neu (etwa eine halbe Minute).\n• Kameras und Einstellungen bleiben erhalten; der Kamera-Dienst startet nur neu, wenn sich seine Dateien ändern.\n• Die jetzige Version wird gesichert, du kannst zurückgehen.', ok: 'Installieren' })) swAct({ action: 'install', confirm: true }, 'Update wird gestartet …'); } }),
           d.state === 'installing' && d.cancel_in !== undefined ? tip(btn('Abbrechen', { size: 'sm', variant: 'danger', disabled: d.cancel_in !== 0, onclick: async () => { if (!await ask({ title: 'Update abbrechen?', text: 'Das Update hängt seit mindestens 5 Minuten. Es wird beendet, die Box bleibt auf der bisherigen Version. Danach kannst du es erneut starten.', ok: 'Abbrechen' })) return; try { await api('POST', '/api/swupdate', { action: 'cancel', confirm: true }); toast('Abbruch angefordert …'); } catch (x) { toast(x.message || 'Abbrechen nicht möglich'); } } }), d.cancel_in === null ? 'Beim Umschalten kann nicht abgebrochen werden.' : d.cancel_in > 0 ? 'Erst möglich, wenn das Update 5 Minuten lang nichts getan hat.' : 'Hängendes Update beenden') : null,
@@ -92,7 +102,7 @@
     T.add('sy-update', 'Updates', h('div', { class: 'stack', style: '--gap:var(--space-5)' }, swBox));
     /* kleiner gelber Punkt am Reiter „Updates“, solange eine neue Version bereitliegt (wie am Menüpunkt System) */
     const updTabDot = h('i', { class: 'dot tab-dot', hidden: true, 'aria-hidden': 'true' }); { const tb = T.list.querySelector('[aria-controls="sy-update"]'); if (tb) tb.append(updTabDot); }
-    const showTabDot = d => { if (d) updTabDot.hidden = !d.newer; };
+    const showTabDot = d => { if (d) updTabDot.hidden = !(d.newer || d.reboot_needed); };
     App.on('swupdate', showTabDot); App.on('hdrupd', showTabDot);
     const uf = document.createElement('div'); uf.hidden = true;
 
