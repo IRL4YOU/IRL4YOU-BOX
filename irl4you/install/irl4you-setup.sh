@@ -156,6 +156,9 @@ if now; then
   elif systemctl is-active --quiet nginx.service; then systemctl reload nginx.service; else systemctl start nginx.service; fi
   # RTMP-Eingang und Statistik: starten, wenn sie noch nicht laufen (nach einem Wechsel von nginx-rtmp auf SRS neu)
   # geänderte SRS-Konfiguration: Neustart trennt die Kameras kurz, darum nie während einer Sendung (dann gilt sie ab dem nächsten Start)
+  # Wurde das SRS-Programm durch ein neues Paket ersetzt, läuft der Dienst noch mit dem alten (Datei "deleted"): gleiche Regel, nie während einer Sendung
+  srs_pid=$(systemctl show -p MainPID --value irl4you-srs.service 2>/dev/null || true)
+  if [ -n "$srs_pid" ] && [ "$srs_pid" != 0 ] && readlink "/proc/$srs_pid/exe" 2>/dev/null | grep -q '(deleted)'; then srs_changed=1; fi
   if [ "$srs_changed" = 1 ] && systemctl is-active --quiet irl4you-srs.service && ! pgrep -x irl4you-encoder >/dev/null 2>&1; then
     systemctl restart irl4you-srs.service
   fi
