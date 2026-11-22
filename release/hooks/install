@@ -14,6 +14,11 @@ for u in updater/systemd/*; do
 done
 [ -e /etc/irl4you/update.conf ] || install -D -m 644 updater/update.conf.example /etc/irl4you/update.conf
 
+# 1b. Lizenzdateien gehören zum Paket (der Update-Helfer legt sie dazu); fehlt etwas, steht es im Update-Protokoll
+for f in LICENSE ZUSATZERLAUBNIS.md NOTICE.md licenses; do
+    [ -e "$f" ] || echo "Hinweis: $f fehlt im Update-Paket"
+done
+
 # 2. Systemteile von IRL4YOU (Dienste, nginx, udev, eigene .deb-Pakete). Das Skript liefert IRL4YOU selbst mit.
 if [ -f install/system-install.sh ]; then
     sh install/system-install.sh
