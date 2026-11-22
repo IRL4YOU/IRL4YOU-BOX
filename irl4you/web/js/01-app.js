@@ -127,6 +127,7 @@ function camNetHtml(c) {
     opts.push(`<option value="${esc(c.iface)}" selected>${esc(c.iface)} (nicht verbunden)</option>`);
   return `<span class="camnet"><select class="camnetsel" data-id="${c.id}" title="Verbindung dieser Kamera: Ihre Adresse gilt für dieses Netz" aria-label="Verbindung">${opts.join("")}</select></span>`;
 }
+// QR-Code-Erzeugung: eigene Entwicklung von IRL4YOU nach der Norm ISO/IEC 18004, kein Fremdcode; Lizenz wie der übrige eigene Code (CC BY-ND 4.0, siehe LICENSE).
 const QR = (() => {
   const EXP = new Uint8Array(512),
     LOG = new Uint8Array(256);
