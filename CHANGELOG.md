@@ -11,6 +11,7 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - Bluetooth: Der Bluetooth-Adapter eines WLAN-Sticks mit AIC8800 steht jetzt in der Adapterliste; für DJI-Kameras wird er nur genutzt, wenn es keinen anderen gibt.
 - Systemupdates: Mit einem IRL4YOU-Update spielt die Box auch die normalen Ubuntu-Updates und Tailscale ein, nie während einer Sendung. Braucht ein Update einen Neustart, steht das im Reiter „Updates“ mit dem Knopf „Jetzt neu starten“ (nicht während der Sendung).
 - Lizenzhinweise vervollständigt: Die in SRS eingebauten Bibliotheken stehen mit ihren Lizenztexten in `NOTICE.md` und `licenses/`.
+- Lizenz: Das Update-Paket enthält jetzt `LICENSE`, `NOTICE.md` und `licenses/`; sie liegen danach auch auf der Box.
 - Stream Link: Handys mit der App „IRL4YOU Stream Link“ senden als zusätzliche Sendewege mit, bis zu 8 (Netzwerk > Stream Link).
 - Kameras: Die Kamera „HDMI und USB“ steht unter „Quellen“ nur, solange sie eingeschaltet ist.
 - Neues Logo für die Box (Würfel in der Plakette) und das Stream-Link-Logo an der Stream-Link-Karte.

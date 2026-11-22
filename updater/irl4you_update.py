@@ -624,7 +624,7 @@ class Updater:
 
     @staticmethod
     def assemble(repo, dest, commit, build=0):
-        """Paket aus dem Repository zusammensetzen: irl4you/ (Programmstand) + release/hooks + updater/ + VERSION + manifest.json.
+        """Paket aus dem Repository zusammensetzen: irl4you/ (Programmstand) + release/hooks + updater/ + Lizenzdateien + VERSION + manifest.json.
         Steht in VERSION nur 'x.y' (Release), wird 'build' (Commits seit dem Release) als dritte Stelle angehängt."""
         src = os.path.join(repo, "irl4you")
         if not os.path.isdir(src) or os.path.islink(src):
@@ -648,6 +648,14 @@ class Updater:
         s = os.path.join(repo, "updater")
         if os.path.isdir(s):
             shutil.copytree(s, os.path.join(dest, "updater"), symlinks=True, dirs_exist_ok=True)
+        # Lizenzdateien des Repositorys gehören zum Paket (Weitergabe von Box und Image): LICENSE, ZUSATZERLAUBNIS.md, NOTICE.md, licenses/
+        for n in ("LICENSE", "ZUSATZERLAUBNIS.md", "NOTICE.md"):
+            s = os.path.join(repo, n)
+            if os.path.isfile(s) and not os.path.islink(s):
+                shutil.copyfile(s, os.path.join(dest, n))
+        s = os.path.join(repo, "licenses")
+        if os.path.isdir(s) and not os.path.islink(s):
+            shutil.copytree(s, os.path.join(dest, "licenses"), symlinks=True, dirs_exist_ok=True)
         with open(os.path.join(dest, "VERSION"), "w", encoding="utf-8") as f:
             f.write(version + "\n")
         manifest["commit"] = commit
