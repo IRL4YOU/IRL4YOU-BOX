@@ -1038,6 +1038,29 @@ class TestRtmpEingang(unittest.TestCase):
         i = sh.index("install/nginx/99-irl4you-rtmps.conf")
         self.assertGreater(i, sh.index('if [ "$SRS_OK" = 1 ]; then'), "RTMPS-Konfiguration nur zusammen mit SRS (sonst zwei listen 1934)")
 
+    def test_srs_paket_einmal_und_mit_system_openssl(self):
+        debs = os.path.join(IRL, "debs")
+        srs = [f for f in os.listdir(debs) if f.startswith("irl4you-srs_")]
+        self.assertEqual(len(srs), 1, "zwei Fassungen im selben apt-Aufruf wären ein Konflikt: " + str(srs))
+        box = open(os.path.join(ROOT, "build", "box-build.sh"), encoding="utf-8").read()
+        self.assertIn("--sys-ssl=on", box, "SRS nutzt das OpenSSL des Systems (Updates von Ubuntu)")
+        self.assertIn("libc6, libstdc++6, libssl3t64", box)
+
+    def test_neuer_srs_stand_wird_gestartet_aber_nicht_waehrend_der_sendung(self):
+        sh = open(os.path.join(INSTALL, "irl4you-setup.sh"), encoding="utf-8").read()
+        i = sh.index("(deleted)")
+        self.assertLess(i, sh.index('if [ "$srs_changed" = 1 ] && systemctl is-active --quiet irl4you-srs.service'))
+        self.assertIn("! pgrep -x irl4you-encoder", sh[i:i + 600])
+
+    def test_lizenztexte_sind_im_verzeichnis_aufgelistet(self):
+        lic = os.path.join(ROOT, "licenses")
+        index = open(os.path.join(lic, "README.md"), encoding="utf-8").read()
+        for f in sorted(os.listdir(lic)):
+            if f != "README.md" and not f.startswith("."):
+                self.assertIn(f, index, "licenses/README.md nennt " + f + " nicht")
+        notice = open(os.path.join(ROOT, "NOTICE.md"), encoding="utf-8").read()
+        self.assertNotIn("OpenSSL 1.1.1l", notice, "das alte OpenSSL steckt nicht mehr im SRS-Programm")
+
     def test_konfiguration(self):
         srs = open(os.path.join(INSTALL, "srs", "srs.conf"), encoding="utf-8").read()
         for k in ("listen              1935;", "gop_cache       on;", "normal_timeout      15000;", "127.0.0.1:1985", "[app]/[stream].ts", "try_annexb_first    off;"):
