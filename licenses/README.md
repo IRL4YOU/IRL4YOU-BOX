@@ -7,7 +7,6 @@ Die Texte sind die Originaldateien der Projekte (Stand 7. November 2026). Wer di
 | srs-MIT.txt | SRS (`irl4you-srs`) | MIT | https://github.com/ossrs/srs |
 | srt-MPL-2.0.txt | libsrt, in SRS eingebaut (`irl4you-srs`) | MPL-2.0 | https://github.com/ossrs/srs (Zweig 6.0release, `trunk/3rdparty/srt-1-fit`) |
 | state-threads-LICENSE.txt | State Threads, in SRS eingebaut | MPL-1.1 oder GPL-2.0-or-later (neuer Code MIT) | https://github.com/ossrs/srs (Zweig 6.0release, `trunk/3rdparty/st-srs`) |
-| openssl-1.1.1-LICENSE.txt | OpenSSL 1.1.1l, in SRS eingebaut | OpenSSL-Lizenz und SSLeay-Lizenz | https://github.com/ossrs/srs (Zweig 6.0release, `trunk/3rdparty/openssl-1.1-fit`) |
 | http-parser-MIT.txt | http-parser 2.9.2, in SRS eingebaut | MIT | https://github.com/nodejs/http-parser (v2.9.2) |
 | json-parser-BSD-2-Clause.txt | json-parser, in SRS eingebaut | BSD-2-Clause | https://github.com/udp/json-parser (Text aus dem Dateikopf in SRS) |
 | libuuid-BSD-3-Clause.txt | libuuid, in SRS eingebaut | BSD-3-Clause | https://github.com/ossrs/srs (`trunk/src/app/srs_app_uuid.*`, Text aus dem Dateikopf) |
