@@ -872,7 +872,8 @@ class TestShippedFiles(unittest.TestCase):
         self.assertEqual(m["version"], version)
         self.assertEqual(m["restart"], ["pipbox.service", "pipbox-rtmpstat.service", "pipbox-dji.service", "pipbox-hdmi.service", "pipbox-health.service", "pipbox-arp.service", "pipbox-link.service"])
         for p in ("hooks/install", "hooks/health", "updater/irl4you_update.py", "updater/systemd/irl4you-update.path",
-                  "install/system-install.sh", "install/zz-irl4you-boot", "VERSION"):
+                  "install/system-install.sh", "install/zz-irl4you-boot", "VERSION",
+                  "LICENSE", "NOTICE.md", "ZUSATZERLAUBNIS.md", "licenses/README.md", "licenses/srt-MPL-2.0.txt"):
             self.assertTrue(os.path.isfile(os.path.join(dest, p)), p)
         self.assertTrue(os.access(os.path.join(dest, "hooks/install"), os.X_OK))
 
