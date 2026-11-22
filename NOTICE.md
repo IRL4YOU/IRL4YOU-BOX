@@ -8,6 +8,7 @@ IRL4YOU Box besteht aus eigenem Code (CC BY-ND 4.0, siehe `LICENSE` und `ZUSATZE
 |---|---|---|
 | Oberfläche, Dienste, Updater, Tests (`irl4you/`, `updater/`, `tests/`) | eigene Entwicklung | CC BY-ND 4.0 |
 | Encoder `irl4you-encoder`, SRTLA-Sender `irl4you-srtla` | eigene Entwicklung (Clean-Room: SRTLA nur nach eigener Protokollbeschreibung) | CC BY-ND 4.0 |
+| QR-Code-Erzeugung `irl4you/web/neu/qr.js` (und der gleiche Teil in `irl4you/web/js/01-app.js`) | eigene Entwicklung nach ISO/IEC 18004, kein Fremdcode | CC BY-ND 4.0 |
 | Bild-in-Bild-Baustein `irl4you/gst-src/` | eigene Entwicklung, lädt zur Laufzeit GStreamer (LGPL) | CC BY-ND 4.0 |
 | Lüfterregelung `irl4you/install/fan/`, Firmware-Werkzeug `irl4you/install/bootloader/irl4you-bootloader.sh`, RTMPS-Zertifikat `irl4you/install/rtmps/` | eigene Entwicklung | CC BY-ND 4.0 |
 | DJI-Kopplung `irl4you/dji_daemon.py`, `dji.py` | Ablauf und Nachrichtenformat nach Moblin (siehe unten), DJI-Dienst von Bittersweet1987 | CC BY-ND 4.0, Moblin-Ablauf unter MIT (Hinweis unten) |
@@ -39,13 +40,16 @@ Die Pakete in `irl4you/debs/` sind für die Box gebaut. Der Quelltext der Fremdp
 | Komponente | Quelle | Lizenz | Hinweis |
 |---|---|---|---|
 | SRS 6.0.193 (`irl4you-srs`) | [ossrs/srs](https://github.com/ossrs/srs) | MIT | RTMP/SRT-Eingang, Bau mit einer Zeile Korrektur (`build/box-build.sh`) |
-| Rockchip MPP 1.1.0 (`irl4you-mpp`) | [rockchip-linux/mpp](https://github.com/rockchip-linux/mpp) | Apache-2.0 | Hardware-Video |
-| Rockchip RGA (`librga`) | [JeffyCN/mirrors](https://github.com/JeffyCN/mirrors), Zweig `linux-rga-multi` | Apache-2.0 | Bildskalierung |
-| GStreamer-Elemente für MPP (`irl4you-gst-rockchip`) | [JeffyCN/mirrors](https://github.com/JeffyCN/mirrors), Zweig `gstreamer-rockchip` | LGPL (COPYING: LGPL-2.1; Quelldateien: LGPL-2 oder neuer) | gebaut gegen MPP; Lizenz gegen den gebauten Zweig geprüft |
+| libsrt (in `irl4you-srs` eingebaut) | `trunk/3rdparty/srt-1-fit` in [ossrs/srs](https://github.com/ossrs/srs), Zweig `6.0release` | MPL-2.0 | im SRS-Programm fest eingebunden, unverändert; Text in `licenses/srt-MPL-2.0.txt` |
+| State Threads (in `irl4you-srs` eingebaut) | `trunk/3rdparty/st-srs` in ossrs/srs, Zweig `6.0release` | MPL-1.1 oder GPL-2.0-or-later (neuer Code MIT) | im SRS-Programm fest eingebunden, unverändert; Text in `licenses/state-threads-LICENSE.txt` |
+| OpenSSL 1.1.1l (in `irl4you-srs` eingebaut) | `trunk/3rdparty/openssl-1.1-fit` in ossrs/srs, Zweig `6.0release` | OpenSSL-Lizenz und SSLeay-Lizenz | im SRS-Programm fest eingebunden (das Programm bindet kein `libssl` der Box ein); Text in `licenses/openssl-1.1.1-LICENSE.txt` |
+| http-parser 2.9.2 (in `irl4you-srs` eingebaut) | [nodejs/http-parser](https://github.com/nodejs/http-parser), Quelltext in `trunk/src/protocol/srs_protocol_http_stack.*` von ossrs/srs | MIT (Joyent, Inc. und andere Node-Mitwirkende) | Text in `licenses/http-parser-MIT.txt` |
+| json-parser (in `irl4you-srs` eingebaut) | [udp/json-parser](https://github.com/udp/json-parser), Quelltext in `trunk/src/protocol/srs_protocol_json.cpp` von ossrs/srs | BSD-2-Clause (James McLaughlin u. a.) | Text in `licenses/json-parser-BSD-2-Clause.txt` |
+| libuuid (in `irl4you-srs` eingebaut) | Quelltext in `trunk/src/app/srs_app_uuid.*` von ossrs/srs | BSD-3-Clause (Theodore Ts'o) | Text in `licenses/libuuid-BSD-3-Clause.txt` |
 | WLAN-Treiber rtw88 (`irl4you-wifi-rtw88`) | [lwfinger/rtw88](https://github.com/lwfinger/rtw88) | GPL-2.0 | Kernelmodul für Kernel 6.1.172 |
 | WLAN-Treiber RTL8188EUS (`irl4you-wifi-rtl8188eus`) | [aircrack-ng/rtl8188eus](https://github.com/aircrack-ng/rtl8188eus), Zweig `v5.3.9` | GPL-2.0 | Kernelmodul für Kernel 6.1.172 |
 | WLAN-Treiber AIC8800 (`irl4you-wifi-aic8800`) | [shenmintao/aic8800d80](https://github.com/shenmintao/aic8800d80), Zweig `legacy-mcu1` | GPL-2.0, Firmware des Herstellers | Kernelmodul für Kernel 6.1.172 |
-| Linux-Kernel (Rockchip BSP 6.1) | [armbian/linux-rockchip](https://github.com/armbian/linux-rockchip) | GPL-2.0 | Quelle für Kernelbaum und Module |
+| Linux-Kernel (Rockchip BSP 6.1) | [armbian/linux-rockchip](https://github.com/armbian/linux-rockchip) | GPL-2.0 | Quelle für Kernelbaum und Module; der Kernelbaum für die Module erhält zwei Patches aus [armbian/build](https://github.com/armbian/build) (`001-hid-sony.patch`, `bluetooth-hci-quirk-v6.1-v6.15.patch`, `build/09-box-kerneltree.sh`) |
 | Firmware-Stand ROCK 5B+ (`irl4you/install/bootloader/rock-5b-plus/armbian/region.bin`) | unverändert aus dem Armbian-Image 26.8.3: U-Boot 2026.04 ([u-boot](https://source.denx.de/u-boot/u-boot), Bau durch [armbian/build](https://github.com/armbian/build)), TF-A v2.13 ([ARM-software/arm-trusted-firmware](https://github.com/ARM-software/arm-trusted-firmware)), DDR-Initialisierung von Rockchip ([rockchip-linux/rkbin](https://github.com/rockchip-linux/rkbin)) | GPL-2.0-or-later (U-Boot), BSD-3-Clause (TF-A), Binärdatei von Rockchip | Quelle und Prüfsumme des Images in `QUELLE.md` neben der Datei |
 | Firmware-Stand Orange Pi 5 Plus (`irl4you/install/bootloader/orange-pi-5-plus/armbian/region.bin`) | unverändert aus dem Armbian-Image 26.8.2: U-Boot 2017.09 im Rockchip-Vendorzweig (Bau durch [armbian/build](https://github.com/armbian/build)), TF-A BL31 v1.48 ([ARM-software/arm-trusted-firmware](https://github.com/ARM-software/arm-trusted-firmware)), DDR-Initialisierung v1.20 von Rockchip ([rockchip-linux/rkbin](https://github.com/rockchip-linux/rkbin)) | GPL-2.0-or-later (U-Boot), BSD-3-Clause (TF-A), Binärdatei von Rockchip | Quelle und Prüfsumme des Images in `QUELLE.md` neben der Datei |
 | bleak 3.0.2, dbus-fast 5.2.0 | PyPI | MIT / MIT | per `pip` bei der Installation geladen, nicht mitgeliefert |
@@ -62,7 +66,7 @@ Der Chat lädt Emotes zur Laufzeit von Twitch, BetterTTV, FrankerFaceZ und 7TV. 
 ## Welche Lizenz gilt wo
 
 - **CC BY-ND 4.0**: der eigene Code dieses Repositorys (Nutzung auch kommerziell erlaubt, Änderungen nur nach Rückfrage bei [Bittersweet1987](https://discord.com/users/232451293040476160) oder [Akinos01](https://discord.com/users/523858990510243861), Ausnahme IRL4YOU; siehe `ZUSATZERLAUBNIS.md`). Die Lizenz gilt auch für frühere Versionen; was jemand vor dem 18.10.2026 unter MIT erhalten hat, behält die damals gewährten Rechte. Der Moblin-Hinweis oben bleibt bestehen.
-- **MIT** (Fremdcode): Moblin-Ablauf, SRS, bleak, dbus-fast.
+- **MIT** (Fremdcode): Moblin-Ablauf, SRS, bleak, dbus-fast. SRS enthält zusätzlich eingebaute Teile unter anderen Lizenzen (libsrt MPL-2.0, State Threads MPL-1.1 oder GPL-2.0-or-later, OpenSSL 1.1.1l, http-parser MIT, json-parser und libuuid BSD), siehe Tabelle.
 - **GPL-2.0**: Kernel, die beiden WLAN-Treiber und U-Boot in den Firmware-Ständen der ROCK 5B+ und der Orange Pi 5 Plus. Die Pakete enthalten die gebauten Module; der Quelltext ist über die oben genannten Quellen und die Bauskripte in `build/` erreichbar.
 - **MIT, Apache-2.0, LGPL**: SRS, MPP und librga (MIT bzw. Apache-2.0), gstreamer-rockchip (LGPL) (siehe Tabelle).
 
