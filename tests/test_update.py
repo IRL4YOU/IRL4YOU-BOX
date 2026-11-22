@@ -877,6 +877,12 @@ class TestShippedFiles(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(dest, p)), p)
         self.assertTrue(os.access(os.path.join(dest, "hooks/install"), os.X_OK))
 
+    def test_hook_meldet_fehlende_lizenzdateien(self):
+        with open(os.path.join(REPO, "release/hooks/install"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("LICENSE ZUSATZERLAUBNIS.md NOTICE.md licenses", text)
+        self.assertIn("fehlt im Update-Paket", text)
+
     def test_default_config_example_loads(self):
         c = U.Config(path=os.path.join(REPO, "updater", "update.conf.example"))
         self.assertEqual((c.repo, c.branch, c.require_ci, c.auto_install), ("IRL4YOU/IRL4YOU-BOX", "main", True, False))
