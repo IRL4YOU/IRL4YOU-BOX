@@ -62,9 +62,10 @@ build_srs() {
     # Fehler in SRS 6.0release: "edge" wird in srs_app_srt_conn.cpp nur im #ifdef SRS_RTC deklariert, aber auch ohne RTC benutzt (Bau mit --rtc=off bricht ab).
     # Minimale Korrektur: die Abfrage dort direkt stellen (Verhalten gleich).
     sed -i 's/if (srt_to_rtmp \&\& edge) {/if (srt_to_rtmp \&\& _srs_config->get_vhost_is_edge(req_->vhost)) {/' src/app/srs_app_srt_conn.cpp
-    ./configure --jobs="$(nproc)" --h265=on --srt=on --rtc=off --gb28181=off --utest=off --https=on --static=off --sanitizer=off --prefix=/usr/lib/irl4you-srs > "$B/srs-configure.log" 2>&1 || { tail -30 "$B/srs-configure.log"; exit 1; }
+    ./configure --jobs="$(nproc)" --h265=on --srt=on --rtc=off --gb28181=off --utest=off --https=on --static=off --sanitizer=off --sys-ssl=on --prefix=/usr/lib/irl4you-srs > "$B/srs-configure.log" 2>&1 || { tail -30 "$B/srs-configure.log"; exit 1; }
     make -j"$(nproc)" > "$B/srs-make.log" 2>&1 || { tail -30 "$B/srs-make.log"; exit 1; }; test -x objs/srs; ./objs/srs -v
-    rm -rf ../st; install -D -m 755 objs/srs ../st/usr/bin/irl4you-srs
+    # OpenSSL kommt vom System (--sys-ssl=on, libssl3t64): wird mit den Ubuntu-Updates versorgt; das Programm wird ohne Debug-Symbole ausgeliefert
+    rm -rf ../st; mkdir -p ../st/usr/bin; strip --strip-unneeded -o ../st/usr/bin/irl4you-srs objs/srs; chmod 755 ../st/usr/bin/irl4you-srs
     local v; v=$(awk '/VERSION_MAJOR/{a=$3} /VERSION_MINOR/{b=$3} /VERSION_REVISION/{c=$3} END{print a"."b"."c}' src/core/srs_core_version6.hpp)
     mkdeb irl4you-srs "$v" "$B/srs/st" "libc6, libstdc++6, libssl3t64" "RTMP/HEVC-Eingang fuer IRL4YOU (SRS 6, ossrs/srs)" "MIT|SRS-Autoren, ossrs/srs"
     cd "$B"
