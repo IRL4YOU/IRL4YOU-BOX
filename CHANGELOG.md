@@ -13,6 +13,7 @@ Versionsschema: x.y.z, angezeigt als vx.y.z. x gibt Marco vor (0 = Alpha). y ste
 - Lizenzhinweise vervollständigt: Die in SRS eingebauten Bibliotheken stehen mit ihren Lizenztexten in `NOTICE.md` und `licenses/`.
 - Lizenz: Das Update-Paket enthält jetzt `LICENSE`, `NOTICE.md` und `licenses/`; sie liegen danach auch auf der Box.
 - Update: Fehlen Lizenzdateien im Paket, steht ein Hinweis im Update-Protokoll.
+- RTMP-Eingang (SRS) auf 6.0.196 mit Sicherheitskorrekturen; nutzt jetzt das OpenSSL von Ubuntu und bekommt damit dessen Updates.
 - Stream Link: Handys mit der App „IRL4YOU Stream Link“ senden als zusätzliche Sendewege mit, bis zu 8 (Netzwerk > Stream Link).
 - Kameras: Die Kamera „HDMI und USB“ steht unter „Quellen“ nur, solange sie eingeschaltet ist.
 - Neues Logo für die Box (Würfel in der Plakette) und das Stream-Link-Logo an der Stream-Link-Karte.

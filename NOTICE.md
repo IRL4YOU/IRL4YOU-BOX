@@ -39,10 +39,9 @@ Die Pakete in `irl4you/debs/` sind für die Box gebaut. Der Quelltext der Fremdp
 
 | Komponente | Quelle | Lizenz | Hinweis |
 |---|---|---|---|
-| SRS 6.0.193 (`irl4you-srs`) | [ossrs/srs](https://github.com/ossrs/srs) | MIT | RTMP/SRT-Eingang, Bau mit einer Zeile Korrektur (`build/box-build.sh`) |
+| SRS 6.0.196 (`irl4you-srs`) | [ossrs/srs](https://github.com/ossrs/srs) | MIT | RTMP/SRT-Eingang, Bau mit einer Zeile Korrektur (`build/box-build.sh`); nutzt das OpenSSL des Systems (Ubuntu) |
 | libsrt (in `irl4you-srs` eingebaut) | `trunk/3rdparty/srt-1-fit` in [ossrs/srs](https://github.com/ossrs/srs), Zweig `6.0release` | MPL-2.0 | im SRS-Programm fest eingebunden, unverändert; Text in `licenses/srt-MPL-2.0.txt` |
 | State Threads (in `irl4you-srs` eingebaut) | `trunk/3rdparty/st-srs` in ossrs/srs, Zweig `6.0release` | MPL-1.1 oder GPL-2.0-or-later (neuer Code MIT) | im SRS-Programm fest eingebunden, unverändert; Text in `licenses/state-threads-LICENSE.txt` |
-| OpenSSL 1.1.1l (in `irl4you-srs` eingebaut) | `trunk/3rdparty/openssl-1.1-fit` in ossrs/srs, Zweig `6.0release` | OpenSSL-Lizenz und SSLeay-Lizenz | im SRS-Programm fest eingebunden (das Programm bindet kein `libssl` der Box ein); Text in `licenses/openssl-1.1.1-LICENSE.txt` |
 | http-parser 2.9.2 (in `irl4you-srs` eingebaut) | [nodejs/http-parser](https://github.com/nodejs/http-parser), Quelltext in `trunk/src/protocol/srs_protocol_http_stack.*` von ossrs/srs | MIT (Joyent, Inc. und andere Node-Mitwirkende) | Text in `licenses/http-parser-MIT.txt` |
 | json-parser (in `irl4you-srs` eingebaut) | [udp/json-parser](https://github.com/udp/json-parser), Quelltext in `trunk/src/protocol/srs_protocol_json.cpp` von ossrs/srs | BSD-2-Clause (James McLaughlin u. a.) | Text in `licenses/json-parser-BSD-2-Clause.txt` |
 | libuuid (in `irl4you-srs` eingebaut) | Quelltext in `trunk/src/app/srs_app_uuid.*` von ossrs/srs | BSD-3-Clause (Theodore Ts'o) | Text in `licenses/libuuid-BSD-3-Clause.txt` |
@@ -66,7 +65,7 @@ Der Chat lädt Emotes zur Laufzeit von Twitch, BetterTTV, FrankerFaceZ und 7TV. 
 ## Welche Lizenz gilt wo
 
 - **CC BY-ND 4.0**: der eigene Code dieses Repositorys (Nutzung auch kommerziell erlaubt, Änderungen nur nach Rückfrage bei [Bittersweet1987](https://discord.com/users/232451293040476160) oder [Akinos01](https://discord.com/users/523858990510243861), Ausnahme IRL4YOU; siehe `ZUSATZERLAUBNIS.md`). Die Lizenz gilt auch für frühere Versionen; was jemand vor dem 18.10.2026 unter MIT erhalten hat, behält die damals gewährten Rechte. Der Moblin-Hinweis oben bleibt bestehen.
-- **MIT** (Fremdcode): Moblin-Ablauf, SRS, bleak, dbus-fast. SRS enthält zusätzlich eingebaute Teile unter anderen Lizenzen (libsrt MPL-2.0, State Threads MPL-1.1 oder GPL-2.0-or-later, OpenSSL 1.1.1l, http-parser MIT, json-parser und libuuid BSD), siehe Tabelle.
+- **MIT** (Fremdcode): Moblin-Ablauf, SRS, bleak, dbus-fast. SRS enthält zusätzlich eingebaute Teile unter anderen Lizenzen (libsrt MPL-2.0, State Threads MPL-1.1 oder GPL-2.0-or-later, http-parser MIT, json-parser und libuuid BSD), siehe Tabelle.
 - **GPL-2.0**: Kernel, die beiden WLAN-Treiber und U-Boot in den Firmware-Ständen der ROCK 5B+ und der Orange Pi 5 Plus. Die Pakete enthalten die gebauten Module; der Quelltext ist über die oben genannten Quellen und die Bauskripte in `build/` erreichbar.
 - **MIT, Apache-2.0, LGPL**: SRS, MPP und librga (MIT bzw. Apache-2.0), gstreamer-rockchip (LGPL) (siehe Tabelle).
 
